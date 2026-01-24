@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warehouse Stock - Smart Refill</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<aside class="sidebar">
+    <h3>Smart Refill</h3>
+    <nav>
+        <a href="/"><i class="fas fa-chart-line"></i> Dashboard</a>
+        <a href="/products"><i class="fas fa-box"></i> Warehouse Stock</a>
+        <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
+        <a href="/inbound"><i class="fas fa-arrow-down"></i> Inbound</a>
+        <a href="/outbound"><i class="fas fa-arrow-up"></i> Outbound</a>
+        <a href="/history"><i class="fas fa-history"></i> Movement History</a>
+        <a href="/refill"><i class="fas fa-exclamation-circle"></i> Refill Alert</a>
+    </nav>
+</aside>
+
+<main class="main">
+
+<header style="margin-bottom: 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <h2><i class="fas fa-warehouse" style="margin-right: 10px;"></i>Warehouse Stock</h2>
+        <p style="color: inherit; margin-top: 4px; opacity: 0.8;">Complete inventory of all SKUs</p>
+    </div>
+    <div class="action-buttons">
+        <a href="/add" class="btn" style="margin-bottom: 0;"><i class="fas fa-plus-circle"></i> Add New SKU</a>
+        <button onclick="SmartRefill.exportTableToCSV('warehouse_stock.csv')" class="btn btn-export" style="margin-bottom: 0;"><i class="fas fa-download"></i> Export CSV</button>
+    </div>
+</header>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }}" style="margin-bottom: 20px;">
+            <i class="fas fa-{% if category == 'error' %}exclamation-circle{% else %}check-circle{% endif %}"></i>
+            <strong>{{ message }}</strong>
+        </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<!-- Charts Section -->
+{% if products|length > 0 %}
+<div class="row g-4 mb-5">
+    <!-- Stock Status Distribution Chart -->
+    <div class="col-lg-6 col-md-6">
+        <div class="card" style="padding: 24px;">
+            <h5 style="margin-bottom: 20px;"><i class="fas fa-pie-chart" style="margin-right: 8px;"></i>Stock Status Distribution</h5>
+            <div style="position: relative; height: 300px;">
+                <canvas id="statusChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Products by Quantity -->
+    <div class="col-lg-6 col-md-6">
+        <div class="card" style="padding: 24px;">
+            <h5 style="margin-bottom: 20px;"><i class="fas fa-chart-bar" style="margin-right: 8px;"></i>Top 5 Products by Quantity</h5>
+            <div style="position: relative; height: 300px;">
+                <canvas id="topProductsChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Search & Filter Bar -->
+<div class="search-filter-bar">
+    <input type="text" id="searchInput" placeholder="🔍 Search by SKU name or category..." style="margin-bottom: 0;">
+    <select id="statusFilter" style="margin-bottom: 0; min-width: 120px;">
+        <option value="all">All Status</option>
+        <option value="NORMAL">Normal</option>
+        <option value="LOW">Low Stock</option>
+        <option value="CRITICAL">Critical</option>
+    </select>
+</div>
+
+<!-- Main Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div style="overflow-x: auto;">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th class="column-number">#</th>
+                    <th><i class="fas fa-cube"></i> SKU Name</th>
+                    <th><i class="fas fa-folder"></i> Category</th>
+                    <th><i class="fas fa-boxes"></i> Current Qty</th>
+                    <th><i class="fas fa-exclamation"></i> Reorder Level</th>
+                    <th><i class="fas fa-info-circle"></i> Status</th>
+                    <th><i class="fas fa-cog"></i> Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if products|length == 0 %}
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 40px; color: #9ca3af;">
+                        <i class="fas fa-inbox" style="font-size: 32px; margin-bottom: 12px; display: block;"></i>
+                        <strong>No SKUs found</strong>
+                        <p style="margin-top: 8px; color: #6b7280;">Your warehouse is empty. Start by adding your first SKU.</p>
+                        <a href="/add" class="btn" style="margin-top: 16px;"><i class="fas fa-plus-circle"></i> Add First SKU</a>
+                    </td>
+                </tr>
+                {% else %}
+                    {% for p in products %}
+                    <tr data-status="{{ p.status }}" data-name="{{ p.name }}" data-category="{{ p.category }}">
+                        <td class="column-number" style="color: #9ca3af; font-weight: 600;">{{ loop.index }}</td>
+                        <td>
+                            <strong class="sku-name" style="color: var(--gray-900);">{{ p.name }}</strong>
+                        </td>
+                        <td>
+                            <span class="badge" style="background-color: #e0f2fe; color: #0c4a6e;">{{ p.category }}</span>
+                        </td>
+                        <td>
+                            <span style="font-weight: 600; color: var(--primary);">{{ p.quantity }}</span>
+                        </td>
+                        <td>
+                            <span style="color: inherit; opacity: 0.7;">{{ p.reorder }}</span>
+                        </td>
+                        <td>
+                            <span class="status {{ p.status }}">{{ p.status }}</span>
+                        </td>
+                        <td style="display: flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap;">
+                            <a href="/edit/{{ p.name }}" class="btn-edit" title="Edit SKU">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <button class="btn-delete" onclick="deleteSKU('{{ p.name }}')" title="Delete SKU">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="/static/enhancements.js"></script>
+<script>
+    // Delete SKU function with confirmation
+    function deleteSKU(productName) {
+        if (confirm(`⚠️ Are you sure you want to DELETE the SKU "${productName}"?\n\nThis action cannot be undone.`)) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/delete/${encodeURIComponent(productName)}`;
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+
+    // Data for charts
+    const products = {{ products|tojson }};
+    
+    // Calculate status distribution
+    let normalCount = 0, lowCount = 0, criticalCount = 0;
+    products.forEach(p => {
+        if (p.status === 'NORMAL') normalCount++;
+        else if (p.status === 'LOW') lowCount++;
+        else if (p.status === 'CRITICAL') criticalCount++;
+    });
+
+    // Sort products by quantity and get top 5
+    const topProducts = products
+        .sort((a, b) => b.quantity - a.quantity)
+        .slice(0, 5);
+
+    // Stock Status Distribution Chart (Pie Chart)
+    const statusCtx = document.getElementById('statusChart');
+    if (statusCtx) {
+        new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Normal Stock', 'Low Stock', 'Critical Stock'],
+                datasets: [{
+                    data: [normalCount, lowCount, criticalCount],
+                    backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                    borderColor: ['#059669', '#d97706', '#dc2626'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 12, weight: 'bold' },
+                            padding: 15,
+                            usePointStyle: true
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Top Products by Quantity Chart (Horizontal Bar Chart)
+    const topProductsCtx = document.getElementById('topProductsChart');
+    if (topProductsCtx) {
+        new Chart(topProductsCtx, {
+            type: 'bar',
+            data: {
+                labels: topProducts.map(p => p.name.substring(0, 20)),
+                datasets: [{
+                    label: 'Quantity',
+                    data: topProducts.map(p => p.quantity),
+                    backgroundColor: '#0066cc',
+                    borderColor: '#0052a3',
+                    borderWidth: 1,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Simple search and filter functionality
+    const searchInput = document.getElementById('searchInput');
+    const statusFilter = document.getElementById('statusFilter');
+    const tableRows = document.querySelectorAll('table tbody tr');
+
+    function applyFilters() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const statusValue = statusFilter.value;
+
+        tableRows.forEach(row => {
+            // Skip empty state row
+            if (!row.hasAttribute('data-status')) {
+                return;
+            }
+
+            const name = row.getAttribute('data-name').toLowerCase();
+            const category = row.getAttribute('data-category').toLowerCase();
+            const status = row.getAttribute('data-status');
+
+            const matchesSearch = name.includes(searchTerm) || category.includes(searchTerm);
+            const matchesStatus = statusValue === 'all' || status === statusValue;
+
+            row.style.display = (matchesSearch && matchesStatus) ? '' : 'none';
+        });
+    }
+
+    // Event listeners
+    searchInput.addEventListener('keyup', applyFilters);
+    statusFilter.addEventListener('change', applyFilters);
+</script>
+
+</main>
+</body>
+</html>
