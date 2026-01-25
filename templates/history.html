@@ -1,90 +1,174 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Movement History - Smart Refill</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
+
 <body>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <h3>Smart Refill</h3>
+        <nav>
+            <a href="/"><i class="fas fa-chart-line"></i> Dashboard</a>
+            <a href="/products"><i class="fas fa-box"></i> Warehouse Stock</a>
+            <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
+            <a href="/inbound"><i class="fas fa-arrow-down"></i> Inbound</a>
+            <a href="/outbound"><i class="fas fa-arrow-up"></i> Outbound</a>
+            <a href="/history"><i class="fas fa-history"></i> Movement History</a>
+            <a href="/refill"><i class="fas fa-exclamation-circle"></i> Refill Alert</a>
+        </nav>
 
-<aside class="sidebar">
-    <h3>Smart Refill</h3>
-    <nav>
-        <a href="/"><i class="fas fa-chart-line"></i> Dashboard</a>
-        <a href="/products"><i class="fas fa-box"></i> Warehouse Stock</a>
-        <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
-        <a href="/inbound"><i class="fas fa-arrow-down"></i> Inbound</a>
-        <a href="/outbound"><i class="fas fa-arrow-up"></i> Outbound</a>
-        <a href="/history"><i class="fas fa-history"></i> Movement History</a>
-        <a href="/refill"><i class="fas fa-exclamation-circle"></i> Refill Alert</a>
-    </nav>
-</aside>
+        <!-- DARK MODE TOGGLE -->
+        <button class="dark-mode-toggle btn" style="margin-bottom: 16px; background-color: var(--secondary);"
+            title="Toggle Dark Mode">
+            <i class="fas fa-moon"></i> Dark Mode
+        </button>
+        <div class="sidebar-user-section">
+            <div class="user-info-card">
+                <div class="user-avatar">
+                    <i class="fas fa-user-circle"></i>
+                </div>
+                <div class="user-details">
+                    <span class="user-name">{{ session.get('username', 'User') }}</span>
+                    <span class="user-role">Warehouse Manager</span>
+                </div>
+            </div>
+            <a href="/logout" class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </aside>
 
-<main class="main">
+    <!-- MAIN CONTENT -->
+    <main class="main">
+        <!-- HEADER -->
+        <header
+            style="margin-bottom: 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div>
+                <h2><i class="fas fa-history" style="margin-right: 12px;"></i>Stock Movement History</h2>
+                <p style="color: inherit; margin-top: 4px; opacity: 0.8;">Complete audit trail of all inventory
+                    movements</p>
+            </div>
+            <a href="/export" class="btn" style="margin-bottom: 0;">
+                <i class="fas fa-download"></i> Download CSV
+            </a>
+        </header>
 
-<header style="margin-bottom: 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-    <div>
-        <h2><i class="fas fa-history" style="margin-right: 12px;"></i>Stock Movement History</h2>
-        <p style="color: inherit; margin-top: 4px; opacity: 0.8;">Complete audit trail of all inventory movements</p>
-    </div>
-    <a href="/export" class="btn" style="margin-bottom: 0;"><i class="fas fa-download"></i> Download CSV</a>
-</header>
+        <!-- FILTER BUTTONS -->
+        <div style="margin-bottom: 24px; display: flex; gap: 12px; flex-wrap: wrap;">
+            <a href="/history?days=1" class="filter-btn" id="filter-today">Today</a>
+            <a href="/history?days=7" class="filter-btn" id="filter-7days">Last 7 Days</a>
+            <a href="/history" class="filter-btn" id="filter-all">All Records</a>
+        </div>
 
-<div style="margin-bottom: 24px; display: flex; gap: 12px; flex-wrap: wrap;">
-    <a href="/history?days=1" class="filter-btn" style="background-color: #0066cc; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">Today</a>
-    <a href="/history?days=7" class="filter-btn" style="background-color: #e5e7eb; color: #374151; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">Last 7 Days</a>
-    <a href="/history" class="filter-btn" style="background-color: #e5e7eb; color: #374151; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">All Records</a>
-</div>
+        <!-- TABLE CARD -->
+        <div class="card" style="padding: 0; overflow: hidden;">
+            <div style="overflow-x: auto;">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th class="column-number">#</th>
+                            <th><i class="fas fa-hashtag"></i> SKU</th>
+                            <th><i class="fas fa-cube"></i> SKU NAME</th>
+                            <th><i class="fas fa-folder"></i> CATEGORY</th>
+                            <th><i class="fas fa-exchange-alt"></i> MOVEMENT</th>
+                            <th><i class="fas fa-boxes"></i> QUANTITY</th>
+                            <th><i class="fas fa-calendar"></i> DATE & TIME</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if movements|length == 0 %}
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 40px; color: #9ca3af;">
+                                <i class="fas fa-inbox"
+                                    style="font-size: 32px; margin-bottom: 12px; display: block;"></i>
+                                <strong>No movement records found</strong>
+                                <p style="margin-top: 8px; color: #6b7280;">Start recording inventory movements to see
+                                    history here.</p>
+                            </td>
+                        </tr>
+                        {% else %}
+                        {% for m in movements %}
+                        <tr>
+                            <!-- Row Number -->
+                            <td class="column-number" style="color: #9ca3af; font-weight: 600;">{{ loop.index }}</td>
 
-<div class="card" style="padding: 0;">
-    <div style="overflow-x: auto;">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th><i class="fas fa-cube"></i> SKU</th>
-                    <th><i class="fas fa-exchange-alt"></i> Type</th>
-                    <th><i class="fas fa-boxes"></i> Quantity</th>
-                    <th><i class="fas fa-calendar"></i> Timestamp</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if movements|length == 0 %}
-                <tr>
-                    <td colspan="4" style="text-align: center; padding: 40px; color: #9ca3af;">
-                        <i class="fas fa-inbox" style="font-size: 32px; margin-bottom: 12px; display: block;"></i>
-                        No movement records found
-                    </td>
-                </tr>
-                {% else %}
-                    {% for m in movements %}
-                    <tr>
-                        <td><strong>{{ m[1] }}</strong></td>
-                        <td>
-                            {% if m[2] == 'INBOUND' %}
-                            <span style="background-color: #d1fae5; color: #065f46; padding: 4px 10px; border-radius: 4px; font-weight: 600; font-size: 12px;">
-                                <i class="fas fa-arrow-down"></i> INBOUND
-                            </span>
-                            {% else %}
-                            <span style="background-color: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 4px; font-weight: 600; font-size: 12px;">
-                                <i class="fas fa-arrow-up"></i> OUTBOUND
-                            </span>
-                            {% endif %}
-                        </td>
-                        <td><strong>{{ m[3] }}</strong></td>
-                        <td style="color: #6b7280; font-size: 13px;">{{ m[4] }}</td>
-                    </tr>
-                    {% endfor %}
-                {% endif %}
-            </tbody>
-        </table>
-    </div>
-</div>
+                            <!-- SKU ID -->
+                            <td><strong style="color: var(--text-primary);">{{ m[0] if m[0] else 'N/A' }}</strong></td>
 
-</main>
+                            <!-- SKU Name -->
+                            <td><strong class="sku-name" style="color: var(--text-primary);">{{ m[1] if m[1] else
+                                    'Unknown' }}</strong></td>
 
-<script src="/static/enhancements.js"></script>
+                            <!-- Category -->
+                            <td>
+                                <span class="badge" style="background-color: #e0f2fe; color: #0c4a6e;">
+                                    {{ m[2] if m[2] else 'Uncategorized' }}
+                                </span>
+                            </td>
+
+                            <!-- Movement Type -->
+                            <td>
+                                {% if m[3] == "IN" %}
+                                <span
+                                    style="background-color: #d1fae5; color: #065f46; padding: 6px 12px; border-radius: 4px; font-weight: 600; font-size: 12px; display: inline-block;">
+                                    <i class="fas fa-arrow-down"></i> INBOUND
+                                </span>
+                                {% elif m[3] == "OUT" %}
+                                <span
+                                    style="background-color: #e0e7ff; color: #3730a3; padding: 6px 12px; border-radius: 4px; font-weight: 600; font-size: 12px; display: inline-block;">
+                                    <i class="fas fa-arrow-up"></i> OUTBOUND
+                                </span>
+                                {% else %}
+                                <span
+                                    style="background-color: #fef3c7; color: #92400e; padding: 6px 12px; border-radius: 4px; font-weight: 600; font-size: 12px; display: inline-block;">
+                                    {{ m[3] }}
+                                </span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Quantity -->
+                            <td><span style="font-weight: 600; color: var(--text-primary);">{{ m[4] }}</span></td>
+
+                            <!-- Timestamp -->
+                            <td style="color: var(--text-secondary); font-size: 13px;">{{ m[5] }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='enhancements.js') }}"></script>
+    <script>
+        // Handle filter button active states
+        document.addEventListener('DOMContentLoaded', function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const days = urlParams.get('days');
+
+            // Remove active class from all buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Add active class based on current filter
+            if (days === '1') {
+                document.getElementById('filter-today').classList.add('active');
+            } else if (days === '7') {
+                document.getElementById('filter-7days').classList.add('active');
+            } else if (!days) {
+                document.getElementById('filter-all').classList.add('active');
+            }
+        });
+    </script>
 </body>
+
 </html>

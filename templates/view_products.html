@@ -22,6 +22,26 @@
         <a href="/history"><i class="fas fa-history"></i> Movement History</a>
         <a href="/refill"><i class="fas fa-exclamation-circle"></i> Refill Alert</a>
     </nav>
+
+    <!-- DARK MODE TOGGLE -->
+    <button class="dark-mode-toggle btn" style="margin-bottom: 16px; background-color: var(--secondary);"
+        title="Toggle Dark Mode">
+        <i class="fas fa-moon"></i> Dark Mode
+    </button>
+            <div class="sidebar-user-section">
+            <div class="user-info-card">
+                <div class="user-avatar">
+                    <i class="fas fa-user-circle"></i>
+                </div>
+                <div class="user-details">
+                    <span class="user-name">{{ session.get('username', 'User') }}</span>
+                    <span class="user-role">Warehouse Manager</span>
+                </div>
+            </div>
+            <a href="/logout" class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
 </aside>
 
 <main class="main">
@@ -32,6 +52,7 @@
         <p style="color: inherit; margin-top: 4px; opacity: 0.8;">Complete inventory of all SKUs</p>
     </div>
     <div class="action-buttons">
+        
         <a href="/add" class="btn" style="margin-bottom: 0;"><i class="fas fa-plus-circle"></i> Add New SKU</a>
         <button onclick="SmartRefill.exportTableToCSV('warehouse_stock.csv')" class="btn btn-export" style="margin-bottom: 0;"><i class="fas fa-download"></i> Export CSV</button>
     </div>

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,123 +8,152 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
 
-<aside class="sidebar">
-    <h3>Smart Refill</h3>
-    <nav>
-        <a href="/"><i class="fas fa-chart-line"></i> Dashboard</a>
-        <a href="/products"><i class="fas fa-box"></i> Warehouse Stock</a>
-        <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
-        <a href="/inbound"><i class="fas fa-arrow-down"></i> Inbound</a>
-        <a href="/outbound"><i class="fas fa-arrow-up"></i> Outbound</a>
-        <a href="/history"><i class="fas fa-history"></i> Movement History</a>
-        <a href="/refill"><i class="fas fa-exclamation-circle"></i> Refill Alert</a>
-    </nav>
-</aside>
+    <aside class="sidebar">
+        <h3>Smart Refill</h3>
+        <nav>
+            <a href="/"><i class="fas fa-chart-line"></i> Dashboard</a>
+            <a href="/products"><i class="fas fa-box"></i> Warehouse Stock</a>
+            <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
+            <a href="/inbound"><i class="fas fa-arrow-down"></i> Inbound</a>
+            <a href="/outbound"><i class="fas fa-arrow-up"></i> Outbound</a>
+            <a href="/history"><i class="fas fa-history"></i> Movement History</a>
+            <a href="/refill"><i class="fas fa-exclamation-circle"></i> Refill Alert</a>
+        </nav>
 
-<main class="main">
+        <!-- DARK MODE TOGGLE -->
+        <button class="dark-mode-toggle btn" style="margin-bottom: 16px; background-color: var(--secondary);"
+            title="Toggle Dark Mode">
+            <i class="fas fa-moon"></i> Dark Mode
+        </button>
+        <div class="sidebar-user-section">
+            <div class="user-info-card">
+                <div class="user-avatar">
+                    <i class="fas fa-user-circle"></i>
+                </div>
+                <div class="user-details">
+                    <span class="user-name">{{ session.get('username', 'User') }}</span>
+                    <span class="user-role">Warehouse Manager</span>
+                </div>
+            </div>
+            <a href="/logout" class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </aside>
 
-<div class="container">
-    <header style="margin-bottom: 28px; text-align: center;">
-        <h2><i class="fas fa-arrow-up" style="margin-right: 12px; color: #6366f1;"></i>Outbound Stock</h2>
-        <p style="color: inherit; margin-top: 8px; opacity: 0.8;">Record goods dispatched to customers</p>
-    </header>
+    <main class="main">
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
+        <div class="container">
+            <header style="margin-bottom: 28px; text-align: center;">
+                <h2><i class="fas fa-arrow-up" style="margin-right: 12px; color: #6366f1;"></i>Outbound Stock</h2>
+                <p style="color: inherit; margin-top: 8px; opacity: 0.8;">Record goods dispatched to customers</p>
+            </header>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
             {% for category, message in messages %}
-            <div style="margin-bottom: 20px; padding: 16px; border-radius: 8px; {% if category == 'error' %}background-color: #fee2e2; border-left: 4px solid #ef4444; color: #991b1b;{% else %}background-color: #d1fae5; border-left: 4px solid #10b981; color: #065f46;{% endif %}">
-                <i class="fas {% if category == 'error' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %}" style="margin-right: 10px;"></i>
+            <div
+                style="margin-bottom: 20px; padding: 16px; border-radius: 8px; {% if category == 'error' %}background-color: #fee2e2; border-left: 4px solid #ef4444; color: #991b1b;{% else %}background-color: #d1fae5; border-left: 4px solid #10b981; color: #065f46;{% endif %}">
+                <i class="fas {% if category == 'error' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %}"
+                    style="margin-right: 10px;"></i>
                 <strong>{{ message }}</strong>
             </div>
             {% endfor %}
-        {% endif %}
-    {% endwith %}
+            {% endif %}
+            {% endwith %}
 
-    <form method="post" onsubmit="return validateOutbound()">
-        <div style="margin-bottom: 24px;">
-            <label><i class="fas fa-cube"></i> Select SKU *</label>
-            <select id="productSelect" name="name" required style="padding: 11px 12px;" onchange="updateAvailableQty()">
-                <option value="">-- Choose a SKU --</option>
-                {% for p in products %}
-                <option value="{{ p[0] }}">{{ p[0] }}</option>
-                {% endfor %}
-            </select>
+            <form method="post" onsubmit="return validateOutbound()">
+                <div style="margin-bottom: 24px;">
+                    <label><i class="fas fa-cube"></i> Select SKU *</label>
+                    <select id="productSelect" name="name" required style="padding: 11px 12px;"
+                        onchange="updateAvailableQty()">
+                        <option value="">-- Choose a SKU --</option>
+                        {% for p in products %}
+                        <option value="{{ p[0] }}">{{ p[0] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <label><i class="fas fa-boxes"></i> Quantity Dispatched *</label>
+                    <input type="number" id="quantityInput" name="quantity" placeholder="Enter quantity" min="1"
+                        required>
+                    <small id="availableText" style="color: #6b7280; margin-top: 8px; display: block;"></small>
+                </div>
+
+                <div style="display: flex; gap: 12px;">
+                    <button type="submit"><i class="fas fa-check-circle"></i> Record Outbound</button>
+                    <a href="/products" class="btn" style="background-color: #6b7280; margin-bottom: 0;"><i
+                            class="fas fa-arrow-left"></i> Cancel</a>
+                </div>
+            </form>
+
+            <div class="info-box"
+                style="margin-top: 40px; padding: 20px; border-radius: 8px; border-left: 4px solid #6366f1;">
+                <h6 style="color: #6366f1; margin-bottom: 12px;"><i class="fas fa-info-circle"></i> Outbound Information
+                </h6>
+                <ul style="margin-bottom: 0; color: #666666; font-size: 13px;">
+                    <li>Outbound records decrease your stock quantity</li>
+                    <li>Enter the exact quantity dispatched to customer</li>
+                    <li>Cannot dispatch more than available inventory</li>
+                    <li>This activity is logged for audit purposes</li>
+                </ul>
+            </div>
         </div>
 
-        <div style="margin-bottom: 24px;">
-            <label><i class="fas fa-boxes"></i> Quantity Dispatched *</label>
-            <input type="number" id="quantityInput" name="quantity" placeholder="Enter quantity" min="1" required>
-            <small id="availableText" style="color: #6b7280; margin-top: 8px; display: block;"></small>
-        </div>
+    </main>
 
-        <div style="display: flex; gap: 12px;">
-            <button type="submit"><i class="fas fa-check-circle"></i> Record Outbound</button>
-            <a href="/products" class="btn" style="background-color: #6b7280; margin-bottom: 0;"><i class="fas fa-arrow-left"></i> Cancel</a>
-        </div>
-    </form>
-
-    <div class="info-box" style="margin-top: 40px; padding: 20px; border-radius: 8px; border-left: 4px solid #6366f1;">
-        <h6 style="color: #6366f1; margin-bottom: 12px;"><i class="fas fa-info-circle"></i> Outbound Information</h6>
-        <ul style="margin-bottom: 0; color: #666666; font-size: 13px;">
-            <li>Outbound records decrease your stock quantity</li>
-            <li>Enter the exact quantity dispatched to customer</li>
-            <li>Cannot dispatch more than available inventory</li>
-            <li>This activity is logged for audit purposes</li>
-        </ul>
-    </div>
-</div>
-
-</main>
-
-<script>
-    const productData = {
+    <script>
+        const productData = {
         {% for p in products %}
-        "{{ p[0] }}": {{ p[1] }},
+        "{{ p[0] }}": { { p[1] } },
         {% endfor %}
     };
 
-    function updateAvailableQty() {
-        const productSelect = document.getElementById('productSelect');
-        const availableText = document.getElementById('availableText');
-        const selectedProduct = productSelect.value;
-        
-        if (selectedProduct && productData[selectedProduct] !== undefined) {
+        function updateAvailableQty() {
+            const productSelect = document.getElementById('productSelect');
+            const availableText = document.getElementById('availableText');
+            const selectedProduct = productSelect.value;
+
+            if (selectedProduct && productData[selectedProduct] !== undefined) {
+                const available = productData[selectedProduct];
+                availableText.textContent = `Available: ${available} units`;
+            } else {
+                availableText.textContent = '';
+            }
+        }
+
+        function validateOutbound() {
+            const productSelect = document.getElementById('productSelect');
+            const quantityInput = document.getElementById('quantityInput');
+            const selectedProduct = productSelect.value;
+            const requestedQty = parseInt(quantityInput.value);
+
+            if (!selectedProduct) {
+                alert('Please select a SKU');
+                return false;
+            }
+
+            if (!requestedQty || requestedQty <= 0) {
+                alert('Please enter a valid quantity');
+                return false;
+            }
+
             const available = productData[selectedProduct];
-            availableText.textContent = `Available: ${available} units`;
-        } else {
-            availableText.textContent = '';
+            if (requestedQty > available) {
+                alert(`Cannot dispatch ${requestedQty} units. Only ${available} units available in inventory.`);
+                return false;
+            }
+
+            return true;
         }
-    }
+    </script>
 
-    function validateOutbound() {
-        const productSelect = document.getElementById('productSelect');
-        const quantityInput = document.getElementById('quantityInput');
-        const selectedProduct = productSelect.value;
-        const requestedQty = parseInt(quantityInput.value);
-
-        if (!selectedProduct) {
-            alert('Please select a SKU');
-            return false;
-        }
-
-        if (!requestedQty || requestedQty <= 0) {
-            alert('Please enter a valid quantity');
-            return false;
-        }
-
-        const available = productData[selectedProduct];
-        if (requestedQty > available) {
-            alert(`Cannot dispatch ${requestedQty} units. Only ${available} units available in inventory.`);
-            return false;
-        }
-
-        return true;
-    }
-</script>
-
-<script src="/static/enhancements.js"></script>
-</main>
+    <script src="/static/enhancements.js"></script>
+    </main>
 </body>
+
 </html>

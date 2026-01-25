@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,186 +8,234 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
 
-<aside class="sidebar">
-    <h3>Smart Refill</h3>
-    <nav>
-        <a href="/"><i class="fas fa-chart-line"></i> Dashboard</a>
-        <a href="/products"><i class="fas fa-box"></i> Warehouse Stock</a>
-        <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
-        <a href="/inbound"><i class="fas fa-arrow-down"></i> Inbound</a>
-        <a href="/outbound"><i class="fas fa-arrow-up"></i> Outbound</a>
-        <a href="/history"><i class="fas fa-history"></i> Movement History</a>
-        <a href="/refill"><i class="fas fa-exclamation-circle"></i> Refill Alert</a>
-    </nav>
-</aside>
+    <aside class="sidebar">
+        <h3>Smart Refill</h3>
+        <nav>
+            <a href="/"><i class="fas fa-chart-line"></i> Dashboard</a>
+            <a href="/products"><i class="fas fa-box"></i> Warehouse Stock</a>
+            <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
+            <a href="/inbound"><i class="fas fa-arrow-down"></i> Inbound</a>
+            <a href="/outbound"><i class="fas fa-arrow-up"></i> Outbound</a>
+            <a href="/history"><i class="fas fa-history"></i> Movement History</a>
+            <a href="/refill"><i class="fas fa-exclamation-circle"></i> Refill Alert</a>
+        </nav>
 
-<main class="main">
+        <!-- DARK MODE TOGGLE -->
+        <button class="dark-mode-toggle btn" style="margin-bottom: 16px; background-color: var(--secondary);"
+            title="Toggle Dark Mode">
+            <i class="fas fa-moon"></i> Dark Mode
+        </button>
+        <div class="sidebar-user-section">
+            <div class="user-info-card">
+                <div class="user-avatar">
+                    <i class="fas fa-user-circle"></i>
+                </div>
+                <div class="user-details">
+                    <span class="user-name">{{ session.get('username', 'User') }}</span>
+                    <span class="user-role">Warehouse Manager</span>
+                </div>
+            </div>
+            <a href="/logout" class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </aside>
 
-<div class="container">
-    <header style="margin-bottom: 28px; text-align: center;">
-        <h2><i class="fas fa-plus-circle" style="margin-right: 12px; color: var(--success);"></i>Add New SKU</h2>
-        <p style="color: inherit; margin-top: 8px; opacity: 0.8;">Add a new product to your warehouse inventory</p>
-    </header>
+    <main class="main">
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
+        <div class="container">
+            <header style="margin-bottom: 28px; text-align: center;">
+                <h2><i class="fas fa-plus-circle" style="margin-right: 12px; color: var(--success);"></i>Add New SKU
+                </h2>
+                <p style="color: inherit; margin-top: 8px; opacity: 0.8;">Add a new product to your warehouse inventory
+                </p>
+            </header>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
             {% for category, message in messages %}
             <div class="alert alert-{{ category }}" style="margin-bottom: 20px;">
                 <i class="fas fa-{% if category == 'error' %}exclamation-circle{% else %}check-circle{% endif %}"></i>
                 <strong>{{ message }}</strong>
             </div>
             {% endfor %}
-        {% endif %}
-    {% endwith %}
+            {% endif %}
+            {% endwith %}
 
-    <form method="post" onsubmit="return validateAddProductForm()">
-        <!-- SKU Information Section -->
-        <div style="margin-bottom: 28px;">
-            <h6 style="color: var(--gray-800); margin-bottom: 16px; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px;"><i class="fas fa-info-circle" style="margin-right: 8px;"></i>SKU Information</h6>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <div class="form-group">
-                    <label><i class="fas fa-tag" style="margin-right: 8px;"></i>SKU Name *</label>
-                    <input type="text" id="skuName" name="name" placeholder="e.g., PROD-2024-001" required>
-                    <small class="text-muted">Must be unique and descriptive</small>
-                </div>
-                <div class="form-group">
-                    <label><i class="fas fa-folder" style="margin-right: 8px;"></i>Category *</label>
-                    <select id="category" name="category" required>
-                        <option value="">Select a category</option>
-                        <option value="Electronics">Electronics</option>
-                        <option value="Hardware">Hardware</option>
-                        <option value="Software">Software</option>
-                        <option value="Accessories">Accessories</option>
-                        <option value="Other">Other</option>
-                    </select>
-                    <small class="text-muted">Choose the product category</small>
-                </div>
-            </div>
-        </div>
-
-        <!-- Stock Information Section -->
-        <div style="margin-bottom: 28px;">
-            <h6 style="color: var(--gray-800); margin-bottom: 16px; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px;"><i class="fas fa-chart-line" style="margin-right: 8px;"></i>Stock Information</h6>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <div class="form-group">
-                    <label><i class="fas fa-boxes" style="margin-right: 8px;"></i>Initial Quantity *</label>
-                    <input type="number" id="quantity" name="quantity" placeholder="0" min="0" value="0" required oninput="updatePreview()">
-                    <small class="text-muted">Starting inventory count</small>
-                </div>
-                <div class="form-group">
-                    <label><i class="fas fa-exclamation" style="margin-right: 8px;"></i>Reorder Level *</label>
-                    <input type="number" id="reorder" name="reorder" placeholder="0" min="0" value="0" required oninput="updatePreview()">
-                    <small class="text-muted">Triggers refill alerts</small>
-                </div>
-            </div>
-        </div>
-
-        <!-- Stock Level Preview -->
-        <div class="card" style="padding: 16px; margin-bottom: 28px; background-color: #f0f9ff; border-left: 4px solid var(--primary);">
-            <h6 style="margin-bottom: 12px; color: var(--primary);"><i class="fas fa-chart-pie" style="margin-right: 8px;"></i>Stock Level Preview</h6>
-            <div style="display: flex; align-items: center; gap: 16px;">
-                <div style="flex: 1;">
-                    <div class="progress" style="height: 12px;">
-                        <div class="progress-bar" id="stockPreviewBar" style="width: 0%;"></div>
+            <form method="post" onsubmit="return validateAddProductForm()">
+                <!-- SKU Information Section -->
+                <div style="margin-bottom: 28px;">
+                    <h6
+                        style="color: var(--gray-800); margin-bottom: 16px; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px;">
+                        <i class="fas fa-info-circle" style="margin-right: 8px;"></i>SKU Information</h6>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="form-group">
+                            <label><i class="fas fa-tag" style="margin-right: 8px;"></i>SKU Name *</label>
+                            <input type="text" id="skuName" name="name" placeholder="e.g., PROD-2024-001" required>
+                            <small class="text-muted">Must be unique and descriptive</small>
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-folder" style="margin-right: 8px;"></i>Category *</label>
+                            <select id="category" name="category" required>
+                                <option value="">Select a category</option>
+                                <option value="Electronics">Electronics</option>
+                                <option value="Hardware">Hardware</option>
+                                <option value="Software">Software</option>
+                                <option value="Accessories">Accessories</option>
+                                <option value="Grocery">Grocery</option>
+                                <option value="Clothing">Clothing</option>
+                                <option value="Furniture">Furniture</option>
+                                <option value="Books">Books</option>
+                                <option value="Toys">Toys</option>
+                                <option value="Sports">Sports</option>
+                                <option value="Beauty">Beauty & Personal Care</option>
+                                <option value="Home">Home & Garden</option>
+                                <option value="Automotive">Automotive</option>
+                                <option value="Health">Health & Wellness</option>
+                                <option value="Office">Office Supplies</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <small class="text-muted">Choose the product category</small>
+                        </div>
                     </div>
                 </div>
-                <span id="stockPercentage" style="font-weight: 600; font-size: 14px; min-width: 50px;">0%</span>
+
+                <!-- Stock Information Section -->
+                <div style="margin-bottom: 28px;">
+                    <h6
+                        style="color: var(--gray-800); margin-bottom: 16px; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px;">
+                        <i class="fas fa-chart-line" style="margin-right: 8px;"></i>Stock Information</h6>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="form-group">
+                            <label><i class="fas fa-boxes" style="margin-right: 8px;"></i>Initial Quantity *</label>
+                            <input type="number" id="quantity" name="quantity" placeholder="0" min="0" value="0"
+                                required oninput="updatePreview()">
+                            <small class="text-muted">Starting inventory count</small>
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-exclamation" style="margin-right: 8px;"></i>Reorder Level *</label>
+                            <input type="number" id="reorder" name="reorder" placeholder="0" min="0" value="0" required
+                                oninput="updatePreview()">
+                            <small class="text-muted">Triggers refill alerts</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stock Level Preview -->
+                <div class="card"
+                    style="padding: 16px; margin-bottom: 28px; background-color: #f0f9ff; border-left: 4px solid var(--primary);">
+                    <h6 style="margin-bottom: 12px; color: var(--primary);"><i class="fas fa-chart-pie"
+                            style="margin-right: 8px;"></i>Stock Level Preview</h6>
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <div style="flex: 1;">
+                            <div class="progress" style="height: 12px;">
+                                <div class="progress-bar" id="stockPreviewBar" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                        <span id="stockPercentage" style="font-weight: 600; font-size: 14px; min-width: 50px;">0%</span>
+                    </div>
+                    <p id="stockStatus" style="margin: 12px 0 0 0; font-size: 12px; color: #1e40af;"></p>
+                </div>
+
+                <!-- Action Buttons -->
+                <div style="display: flex; gap: 12px; margin-top: 28px;">
+                    <button type="submit" style="flex: 1; background-color: var(--success);"><i
+                            class="fas fa-check-circle"></i> Add SKU</button>
+                    <a href="/products" class="btn"
+                        style="background-color: var(--gray-500); flex: 1; text-align: center; margin-bottom: 0;"><i
+                            class="fas fa-times-circle"></i> Cancel</a>
+                </div>
+            </form>
+
+            <!-- Information Box -->
+            <div class="info-tips-box"
+                style="margin-top: 40px; padding: 20px; background: #eff6ff; border-radius: 8px; border-left: 4px solid var(--primary); display: inline-block; width: 100%;">
+                <h6 style="color: var(--primary); margin-bottom: 12px;"><i class="fas fa-lightbulb"></i> Important Tips
+                </h6>
+                <ul style="margin-bottom: 0; color: #1e40af; font-size: 13px; line-height: 1.8;">
+                    <li><strong>SKU Name:</strong> Must be unique. Use a format like PROD-2024-001</li>
+                    <li><strong>Category:</strong> Choose from predefined categories for better organization</li>
+                    <li><strong>Initial Quantity:</strong> Current stock level in your warehouse</li>
+                    <li><strong>Reorder Level:</strong> When stock falls below this, a refill alert is triggered</li>
+                    <li><strong>Best Practice:</strong> Set reorder level to 2-3 weeks of average usage</li>
+                </ul>
             </div>
-            <p id="stockStatus" style="margin: 12px 0 0 0; font-size: 12px; color: #1e40af;"></p>
         </div>
 
-        <!-- Action Buttons -->
-        <div style="display: flex; gap: 12px; margin-top: 28px;">
-            <button type="submit" style="flex: 1; background-color: var(--success);"><i class="fas fa-check-circle"></i> Add SKU</button>
-            <a href="/products" class="btn" style="background-color: var(--gray-500); flex: 1; text-align: center; margin-bottom: 0;"><i class="fas fa-times-circle"></i> Cancel</a>
-        </div>
-    </form>
+        <script src="/static/enhancements.js"></script>
+        <script>
+            function validateAddProductForm() {
+                const skuName = document.getElementById('skuName').value.trim();
+                const category = document.getElementById('category').value.trim();
+                const quantity = parseInt(document.getElementById('quantity').value);
+                const reorder = parseInt(document.getElementById('reorder').value);
 
-    <!-- Information Box -->
-    <div class="info-tips-box" style="margin-top: 40px; padding: 20px; background: #eff6ff; border-radius: 8px; border-left: 4px solid var(--primary); display: inline-block; width: 100%;">
-        <h6 style="color: var(--primary); margin-bottom: 12px;"><i class="fas fa-lightbulb"></i> Important Tips</h6>
-        <ul style="margin-bottom: 0; color: #1e40af; font-size: 13px; line-height: 1.8;">
-            <li><strong>SKU Name:</strong> Must be unique. Use a format like PROD-2024-001</li>
-            <li><strong>Category:</strong> Choose from predefined categories for better organization</li>
-            <li><strong>Initial Quantity:</strong> Current stock level in your warehouse</li>
-            <li><strong>Reorder Level:</strong> When stock falls below this, a refill alert is triggered</li>
-            <li><strong>Best Practice:</strong> Set reorder level to 2-3 weeks of average usage</li>
-        </ul>
-    </div>
-</div>
+                // Clear previous errors
+                document.querySelectorAll('.form-group').forEach(g => g.classList.remove('error'));
 
-<script src="/static/enhancements.js"></script>
-<script>
-    function validateAddProductForm() {
-        const skuName = document.getElementById('skuName').value.trim();
-        const category = document.getElementById('category').value.trim();
-        const quantity = parseInt(document.getElementById('quantity').value);
-        const reorder = parseInt(document.getElementById('reorder').value);
+                let isValid = true;
 
-        // Clear previous errors
-        document.querySelectorAll('.form-group').forEach(g => g.classList.remove('error'));
+                if (!skuName) {
+                    SmartRefill.markFieldError(document.getElementById('skuName'), 'SKU Name is required');
+                    isValid = false;
+                }
 
-        let isValid = true;
+                if (!category) {
+                    SmartRefill.markFieldError(document.getElementById('category'), 'Category is required');
+                    isValid = false;
+                }
 
-        if (!skuName) {
-            SmartRefill.markFieldError(document.getElementById('skuName'), 'SKU Name is required');
-            isValid = false;
-        }
+                if (isNaN(quantity) || quantity < 0) {
+                    SmartRefill.markFieldError(document.getElementById('quantity'), 'Quantity must be a valid non-negative number');
+                    isValid = false;
+                }
 
-        if (!category) {
-            SmartRefill.markFieldError(document.getElementById('category'), 'Category is required');
-            isValid = false;
-        }
+                if (isNaN(reorder) || reorder < 0) {
+                    SmartRefill.markFieldError(document.getElementById('reorder'), 'Reorder Level must be a valid non-negative number');
+                    isValid = false;
+                }
 
-        if (isNaN(quantity) || quantity < 0) {
-            SmartRefill.markFieldError(document.getElementById('quantity'), 'Quantity must be a valid non-negative number');
-            isValid = false;
-        }
+                if (isValid) {
+                    SmartRefill.showAlert('SKU added successfully!', 'success', 2000);
+                }
 
-        if (isNaN(reorder) || reorder < 0) {
-            SmartRefill.markFieldError(document.getElementById('reorder'), 'Reorder Level must be a valid non-negative number');
-            isValid = false;
-        }
+                return isValid;
+            }
 
-        if (isValid) {
-            SmartRefill.showAlert('SKU added successfully!', 'success', 2000);
-        }
+            function updatePreview() {
+                const quantity = parseInt(document.getElementById('quantity').value) || 0;
+                const reorder = parseInt(document.getElementById('reorder').value) || 1;
 
-        return isValid;
-    }
+                const percentage = Math.min((quantity / reorder * 100), 100);
+                document.getElementById('stockPreviewBar').style.width = percentage + '%';
+                document.getElementById('stockPercentage').textContent = Math.round(percentage) + '%';
 
-    function updatePreview() {
-        const quantity = parseInt(document.getElementById('quantity').value) || 0;
-        const reorder = parseInt(document.getElementById('reorder').value) || 1;
-        
-        const percentage = Math.min((quantity / reorder * 100), 100);
-        document.getElementById('stockPreviewBar').style.width = percentage + '%';
-        document.getElementById('stockPercentage').textContent = Math.round(percentage) + '%';
-        
-        let statusText = '';
-        let statusColor = '';
-        
-        if (quantity <= reorder / 2) {
-            statusText = '<i class="fas fa-exclamation-circle"></i> CRITICAL - Stock is critically low';
-            statusColor = 'color: var(--danger);';
-        } else if (quantity <= reorder) {
-            statusText = '<i class="fas fa-exclamation-triangle"></i> LOW - Stock is below reorder level';
-            statusColor = 'color: var(--warning);';
-        } else {
-            statusText = '<i class="fas fa-check-circle"></i> NORMAL - Stock level is healthy';
-            statusColor = 'color: var(--success);';
-        }
-        
-        document.getElementById('stockStatus').innerHTML = statusText;
-        document.getElementById('stockStatus').setAttribute('style', statusColor + 'font-size: 12px;');
-    }
+                let statusText = '';
+                let statusColor = '';
 
-    // Initialize preview
-    updatePreview();
-</script>
+                if (quantity <= reorder / 2) {
+                    statusText = '<i class="fas fa-exclamation-circle"></i> CRITICAL - Stock is critically low';
+                    statusColor = 'color: var(--danger);';
+                } else if (quantity <= reorder) {
+                    statusText = '<i class="fas fa-exclamation-triangle"></i> LOW - Stock is below reorder level';
+                    statusColor = 'color: var(--warning);';
+                } else {
+                    statusText = '<i class="fas fa-check-circle"></i> NORMAL - Stock level is healthy';
+                    statusColor = 'color: var(--success);';
+                }
 
-</main>
+                document.getElementById('stockStatus').innerHTML = statusText;
+                document.getElementById('stockStatus').setAttribute('style', statusColor + 'font-size: 12px;');
+            }
+
+            // Initialize preview
+            updatePreview();
+        </script>
+
+    </main>
 </body>
+
 </html>

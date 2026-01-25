@@ -8,32 +8,37 @@
 // DARK MODE TOGGLE
 // ============================================================
 
-function initializeDarkMode() {
-    const savedMode = localStorage.getItem('darkMode');
-    const darkModeToggle = document.querySelector('.dark-mode-toggle');
+const darkModeToggle = document.querySelector('.dark-mode-toggle');
 
-    if (savedMode === 'enabled') {
+if (darkModeToggle) {
+    // Check for saved preference
+    if (localStorage.getItem('darkMode') === 'enabled') {
         document.body.classList.add('dark-mode');
-        if (darkModeToggle) darkModeToggle.textContent = '🌙';
-    } else {
-        if (darkModeToggle) darkModeToggle.textContent = '☀️';
+        updateToggleIcon();
     }
 
-    if (darkModeToggle) {
-        darkModeToggle.addEventListener('click', toggleDarkMode);
-    }
+    darkModeToggle.addEventListener('click', function() {
+        document.body.classList.toggle('dark-mode');
+        
+        // Save preference
+        if (document.body.classList.contains('dark-mode')) {
+            localStorage.setItem('darkMode', 'enabled');
+        } else {
+            localStorage.setItem('darkMode', 'disabled');
+        }
+        
+        updateToggleIcon();
+    });
 }
 
-function toggleDarkMode() {
-    document.body.classList.toggle('dark-mode');
-    const darkModeToggle = document.querySelector('.dark-mode-toggle');
+function updateToggleIcon() {
+    const toggle = document.querySelector('.dark-mode-toggle');
+    if (!toggle) return;
     
     if (document.body.classList.contains('dark-mode')) {
-        localStorage.setItem('darkMode', 'enabled');
-        if (darkModeToggle) darkModeToggle.textContent = '🌙';
+        toggle.innerHTML = '<i class="fas fa-sun"></i> Light Mode';
     } else {
-        localStorage.setItem('darkMode', 'disabled');
-        if (darkModeToggle) darkModeToggle.textContent = '☀️';
+        toggle.innerHTML = '<i class="fas fa-moon"></i> Dark Mode';
     }
 }
 
