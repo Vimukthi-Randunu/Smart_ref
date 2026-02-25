@@ -22,6 +22,12 @@ def _migrate_db():
             cur.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT NULL")
         if "email_alerts" not in existing:
             cur.execute("ALTER TABLE users ADD COLUMN email_alerts INTEGER DEFAULT 1")
+        if "smtp_email" not in existing:
+            cur.execute("ALTER TABLE users ADD COLUMN smtp_email TEXT DEFAULT NULL")
+        if "smtp_pass" not in existing:
+            cur.execute("ALTER TABLE users ADD COLUMN smtp_pass TEXT DEFAULT NULL")
+        if "last_alert_sent" not in existing:
+            cur.execute("ALTER TABLE users ADD COLUMN last_alert_sent TIMESTAMP DEFAULT NULL")
         conn.commit()
         conn.close()
     except Exception as _e:
@@ -37,11 +43,16 @@ MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD",  "")   # Gmail App Password
 MAIL_FROM     = os.environ.get("MAIL_FROM",      MAIL_USERNAME)
 
 # ─── EMAIL HELPER ───
-def send_stock_alert_email(to_email: str, username: str, alert_products: list):
+def send_stock_alert_email(to_email: str, username: str, alert_products: list,
+                           smtp_user: str = None, smtp_pass: str = None):
     """Send a rich HTML low-stock alert email. Runs in a background thread so it
-    does not block the HTTP response."""
-    if not MAIL_USERNAME or not MAIL_PASSWORD:
-        return  # Email not configured — silently skip
+    does not block the HTTP response.
+    Uses per-user smtp_user/smtp_pass if provided, else falls back to env vars."""
+    _smtp_user = smtp_user or MAIL_USERNAME
+    _smtp_pass = smtp_pass or MAIL_PASSWORD
+    if not _smtp_user or not _smtp_pass:
+        print("[Email] SMTP credentials not configured — skipping alert.")
+        return
     if not to_email:
         return
 
@@ -158,18 +169,130 @@ def send_stock_alert_email(to_email: str, username: str, alert_products: list):
         try:
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
-            msg['From']    = f"SmartRefill <{MAIL_FROM}>"
+            msg['From']    = f"SmartRefill <{_smtp_user}>"
             msg['To']      = to_email
             msg.attach(MIMEText(html, 'html'))
             with smtplib.SMTP(MAIL_SERVER, MAIL_PORT) as server:
                 server.ehlo()
                 server.starttls()
-                server.login(MAIL_USERNAME, MAIL_PASSWORD)
-                server.sendmail(MAIL_FROM, to_email, msg.as_string())
+                server.login(_smtp_user, _smtp_pass)
+                server.sendmail(_smtp_user, to_email, msg.as_string())
+            print(f"[Email] ✅ Alert sent to {to_email} for {len(alert_products)} item(s).")
         except Exception as exc:
-            print(f"[Email] Failed to send alert: {exc}")
+            print(f"[Email] ❌ Failed to send alert: {exc}")
 
     threading.Thread(target=_send, daemon=True).start()
+
+
+# ─── HELPER: get all low/critical stock products for a user ───
+def get_low_stock_products(user_id, conn):
+    """Returns a list of dicts for all products at or below reorder level."""
+    cur = conn.cursor()
+    thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
+    cur.execute("""
+        SELECT p.name, p.category, p.quantity, p.reorder_level, p.cost_per_unit,
+               COALESCE(SUM(CASE WHEN s.movement_type='OUT' AND s.timestamp > ? THEN s.quantity ELSE 0 END), 0) as out_30
+        FROM products p
+        LEFT JOIN stock_movements s ON p.name = s.product_name AND s.user_id = p.user_id
+        WHERE p.user_id = ? AND p.quantity <= p.reorder_level
+        GROUP BY p.name
+    """, (thirty_days_ago, user_id))
+
+    products = []
+    for row in cur.fetchall():
+        name, category, qty, reorder, cost, out_30 = row
+        avg_daily  = round(out_30 / 30, 2) if out_30 > 0 else 0
+        days_rem   = round(qty / avg_daily, 1) if avg_daily > 0 else None
+        status     = get_stock_status(qty, reorder)
+        suggested  = max(1, int(avg_daily * 14) - qty) if avg_daily > 0 else reorder * 2
+        products.append({
+            'name': name, 'category': category,
+            'quantity': qty, 'reorder': reorder,
+            'status': status, 'days_remaining': days_rem,
+            'suggested_qty': suggested
+        })
+    # CRITICAL first, then LOW
+    products.sort(key=lambda x: 0 if x['status'] == 'CRITICAL' else 1)
+    return products
+
+
+# ─── HELPER: auto-send alert for a user (with 2-hour cooldown) ───
+def try_send_auto_alert(user_id):
+    """Checks if the user has low/critical stock and sends a comprehensive
+    alert email. Respects a 2-hour cooldown to avoid spamming."""
+    try:
+        conn = get_connection()
+        cur  = conn.cursor()
+        cur.execute(
+            "SELECT email, email_alerts, username, smtp_email, smtp_pass, last_alert_sent FROM users WHERE id = ?",
+            (user_id,)
+        )
+        u = cur.fetchone()
+        if not u:
+            conn.close()
+            return
+
+        to_email, alerts_on, username, smtp_email, smtp_pass, last_sent = u
+
+        # Must have alerts enabled, a recipient email, and SMTP credentials
+        if not alerts_on or not to_email or not smtp_email or not smtp_pass:
+            conn.close()
+            return
+
+        # 2-hour cooldown: don't flood the inbox
+        if last_sent:
+            try:
+                last_dt = datetime.strptime(last_sent[:19], '%Y-%m-%d %H:%M:%S')
+                if (datetime.now() - last_dt).total_seconds() < 7200:
+                    conn.close()
+                    return
+            except Exception:
+                pass
+
+        alert_products = get_low_stock_products(user_id, conn)
+        if not alert_products:
+            conn.close()
+            return
+
+        # Record send time BEFORE dispatching so parallel triggers don't double-send
+        cur.execute(
+            "UPDATE users SET last_alert_sent = ? WHERE id = ?",
+            (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user_id)
+        )
+        conn.commit()
+        conn.close()
+
+        send_stock_alert_email(to_email, username, alert_products, smtp_email, smtp_pass)
+        print(f"[auto-alert] Sent to user {user_id} ({username}) — {len(alert_products)} item(s) low.")
+
+    except Exception as exc:
+        print(f"[auto-alert] Error for user {user_id}: {exc}")
+
+
+# ─── BACKGROUND PERIODIC ALERT CHECK (every 6 hours) ───
+def _background_alert_check():
+    """Runs every 6 hours. Sends auto-alerts to any user with unconfigured
+    low stock who has SMTP credentials set up."""
+    print("[bg-alert] Running periodic stock alert check...")
+    try:
+        conn = get_connection()
+        cur  = conn.cursor()
+        cur.execute(
+            "SELECT id FROM users WHERE email_alerts = 1 AND email IS NOT NULL "
+            "AND smtp_email IS NOT NULL AND smtp_pass IS NOT NULL"
+        )
+        user_ids = [row[0] for row in cur.fetchall()]
+        conn.close()
+        for uid in user_ids:
+            try_send_auto_alert(uid)
+    except Exception as exc:
+        print(f"[bg-alert] Error: {exc}")
+    finally:
+        # Schedule next run in 6 hours
+        threading.Timer(6 * 3600, _background_alert_check).start()
+
+# Kick off the first background check 60 seconds after startup
+threading.Timer(60, _background_alert_check).start()
 
 
 # -------- AUTHENTICATION DECORATOR --------
@@ -642,35 +765,9 @@ def outbound():
             )
             conn.commit()
 
-            # ── Auto email alert if stock drops below reorder after outbound ──
-            try:
-                cur2 = conn.cursor()
-                cur2.execute(
-                    "SELECT quantity, reorder_level, category FROM products WHERE user_id = ? AND name = ?",
-                    (user_id, name)
-                )
-                prod = cur2.fetchone()
-                if prod:
-                    new_qty, reorder_lvl, category = prod
-                    status = get_stock_status(new_qty, reorder_lvl)
-                    if status in ('CRITICAL', 'LOW'):
-                        cur2.execute("SELECT email, email_alerts, username FROM users WHERE id = ?", (user_id,))
-                        u = cur2.fetchone()
-                        if u and u[0] and u[1]:
-                            avg_daily_out = round(qty / 1, 2)  # simple estimate
-                            days_rem = round(new_qty / avg_daily_out, 1) if avg_daily_out > 0 else None
-                            send_stock_alert_email(
-                                to_email=u[0],
-                                username=u[2],
-                                alert_products=[{
-                                    'name': name, 'category': category,
-                                    'quantity': new_qty, 'reorder': reorder_lvl,
-                                    'status': status, 'days_remaining': days_rem,
-                                    'suggested_qty': max(1, reorder_lvl * 2 - new_qty)
-                                }]
-                            )
-            except Exception:
-                pass  # Never let email errors break the outbound flow
+            # ── Auto email alert: comprehensive check for ALL low stock items ──
+            # Runs in background thread — never blocks the HTTP response
+            threading.Thread(target=try_send_auto_alert, args=(user_id,), daemon=True).start()
 
             flash(f"Successfully recorded outbound: {qty} units of '{name}'", "success")
         except Exception as e:
@@ -1020,7 +1117,7 @@ def refill():
 
     return render_template("refill.html", products=refill_list)
 
-# ─── MANUAL EMAIL ALERT (POST from Refill page) ───
+# ─── MANUAL TEST EMAIL ALERT (from Refill page) ───
 @app.route("/send-alert", methods=["POST"])
 @login_required
 def send_alert():
@@ -1028,50 +1125,44 @@ def send_alert():
     conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT email, email_alerts, username FROM users WHERE id = ?", (user_id,))
+    cur.execute(
+        "SELECT email, email_alerts, username, smtp_email, smtp_pass FROM users WHERE id = ?",
+        (user_id,)
+    )
     u = cur.fetchone()
-
-    if not u or not u[0]:
-        conn.close()
-        flash("⚠️ No email address saved. Please add one in Profile Settings first.", "error")
-        return redirect("/refill")
-
-    user_email, alerts_enabled, username = u
-
-    thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
-    cur.execute("""
-        SELECT p.name, p.category, p.quantity, p.reorder_level, p.sales_count,
-               COALESCE(SUM(CASE WHEN s.movement_type='OUT' AND s.timestamp > ? THEN s.quantity ELSE 0 END), 0) as out_30
-        FROM products p
-        LEFT JOIN stock_movements s ON p.name = s.product_name AND s.user_id = p.user_id
-        WHERE p.user_id = ? AND p.quantity <= p.reorder_level
-        GROUP BY p.name
-    """, (thirty_days_ago, user_id))
-
-    alert_products = []
-    for row in cur.fetchall():
-        name, category, qty, reorder, sales, out_30 = row
-        avg_daily = round(out_30 / 30, 2) if out_30 > 0 else 0
-        days_rem  = round(qty / avg_daily, 1) if avg_daily > 0 else None
-        status    = get_stock_status(qty, reorder)
-        alert_products.append({
-            'name': name, 'category': category,
-            'quantity': qty, 'reorder': reorder,
-            'status': status, 'days_remaining': days_rem,
-            'suggested_qty': max(1, int(avg_daily * 14) - qty) if avg_daily > 0 else reorder * 2
-        })
     conn.close()
 
+    if not u or not u[0]:
+        flash("⚠️ No recipient email set. Go to Profile Settings and add your email address.", "error")
+        return redirect("/refill")
+
+    to_email, alerts_on, username, smtp_email, smtp_pass = u
+
+    if not smtp_email or not smtp_pass:
+        flash("⚠️ SMTP credentials not configured. Go to Profile Settings → Email & SMTP Setup.", "error")
+        return redirect("/profile")
+
+    conn2 = get_connection()
+    alert_products = get_low_stock_products(user_id, conn2)
+    conn2.close()
+
     if not alert_products:
-        flash("✅ No low-stock items right now — nothing to report!", "success")
+        flash("✅ All stock levels are healthy right now — no alert needed!", "success")
         return redirect("/refill")
 
-    if not MAIL_USERNAME or not MAIL_PASSWORD:
-        flash("📧 Email server not configured. Ask your admin to set MAIL_USERNAME and MAIL_PASSWORD env vars.", "error")
-        return redirect("/refill")
+    # Bypass cooldown for manual test — always send
+    send_stock_alert_email(to_email, username, alert_products, smtp_email, smtp_pass)
 
-    send_stock_alert_email(user_email, username, alert_products)
-    flash(f"📧 Alert email sent to {user_email} with {len(alert_products)} item(s)!", "success")
+    # Update last_alert_sent so the auto system respects the cooldown
+    conn3 = get_connection()
+    conn3.execute(
+        "UPDATE users SET last_alert_sent = ? WHERE id = ?",
+        (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user_id)
+    )
+    conn3.commit()
+    conn3.close()
+
+    flash(f"📧 Test alert email sent to {to_email} with {len(alert_products)} low-stock item(s)!", "success")
     return redirect("/refill")
 
 # ─── PROFILE / SETTINGS ───
@@ -1086,17 +1177,28 @@ def profile():
         action = request.form.get("action", "")
 
         if action == "update_email":
-            new_email       = request.form.get("email", "").strip()
-            email_alerts    = 1 if request.form.get("email_alerts") else 0
+            new_email    = request.form.get("email", "").strip()
+            email_alerts = 1 if request.form.get("email_alerts") else 0
+            new_smtp_email = request.form.get("smtp_email", "").strip()
+            new_smtp_pass  = request.form.get("smtp_pass", "").strip()
+
             if new_email and "@" not in new_email:
-                flash("Please enter a valid email address.", "error")
+                flash("Please enter a valid recipient email address.", "error")
+            elif new_smtp_email and "@" not in new_smtp_email:
+                flash("Please enter a valid Gmail address for SMTP.", "error")
             else:
                 cur.execute(
-                    "UPDATE users SET email = ?, email_alerts = ? WHERE id = ?",
-                    (new_email or None, email_alerts, user_id)
+                    "UPDATE users SET email = ?, email_alerts = ?, smtp_email = ?, smtp_pass = ? WHERE id = ?",
+                    (
+                        new_email or None,
+                        email_alerts,
+                        new_smtp_email or None,
+                        new_smtp_pass or None,
+                        user_id
+                    )
                 )
                 conn.commit()
-                flash("✅ Email settings saved!", "success")
+                flash("✅ Email & SMTP settings saved! Automatic alerts are now active.", "success")
 
         elif action == "change_password":
             current_pw  = request.form.get("current_password", "")
@@ -1121,13 +1223,15 @@ def profile():
         conn.close()
         return redirect("/profile")
 
-    cur.execute("SELECT username, email, email_alerts FROM users WHERE id = ?", (user_id,))
+    cur.execute("SELECT username, email, email_alerts, smtp_email, smtp_pass FROM users WHERE id = ?", (user_id,))
     row = cur.fetchone()
     conn.close()
     user_data = {
         'username':     row[0] if row else session.get('username', ''),
         'email':        row[1] if row else '',
         'email_alerts': row[2] if row else 1,
+        'smtp_email':   row[3] if row else '',
+        'smtp_pass':    row[4] if row else '',
     }
     return render_template("profile.html", user=user_data)
 

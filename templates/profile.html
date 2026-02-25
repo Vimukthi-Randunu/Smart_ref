@@ -68,25 +68,27 @@
                 <!-- ── EMAIL SETTINGS ── -->
                 <div class="form-card fade-in" style="grid-column:1/-1">
                     <div class="section-heading" style="margin-bottom:22px">
-                        <i class="fas fa-envelope"></i> Email Alert Settings
+                        <i class="fas fa-envelope"></i> Alert Recipient Settings
                     </div>
                     <p style="color:var(--muted);font-size:13px;margin-bottom:22px;line-height:1.7">
-                        SmartRefill can send you an email whenever a product drops to <strong
-                            style="color:var(--accent)">LOW</strong> or
-                        <strong style="color:var(--red)">CRITICAL</strong> stock levels — either automatically after an
-                        outbound, or on demand from the
-                        <a href="/refill" style="color:var(--primary2)">Refill Alerts</a> page.
+                        SmartRefill automatically sends you an email whenever any product drops to
+                        <strong style="color:var(--accent)">LOW</strong> or
+                        <strong style="color:var(--red)">CRITICAL</strong> stock — triggered instantly after any
+                        outbound movement AND checked every 6 hours in the background.
+                        A <strong style="color:var(--text)">2-hour cooldown</strong> prevents inbox flooding.
                     </p>
 
                     <form method="POST" action="/profile">
                         <input type="hidden" name="action" value="update_email">
+                        <input type="hidden" name="smtp_email" value="{{ user.smtp_email or '' }}">
+                        <input type="hidden" name="smtp_pass" value="{{ user.smtp_pass or '' }}">
                         <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end">
                             <div class="form-group" style="margin-bottom:0">
-                                <label><i class="fas fa-at"></i> Your Email Address</label>
+                                <label><i class="fas fa-at"></i> Recipient Email Address</label>
                                 <input type="email" name="email" class="form-control" id="profile-email"
-                                    value="{{ user.email or '' }}" placeholder="yourname@gmail.com">
+                                    value="{{ user.email or '' }}" placeholder="where_to_send_alerts@gmail.com">
                                 <small style="color:var(--muted);font-size:11.5px;margin-top:5px;display:block">
-                                    Alerts will be sent to this address. Leave blank to disable.
+                                    Alerts will be sent to this address. Can be different from your Gmail sender.
                                 </small>
                             </div>
                             <button type="submit" class="btn-glow" style="height:44px;white-space:nowrap">
@@ -103,38 +105,96 @@
                                 <span class="toggle-slider"></span>
                             </label>
                             <div>
-                                <div style="font-weight:600;font-size:13.5px;color:var(--text)">Email Alerts Enabled
-                                </div>
-                                <div style="font-size:12px;color:var(--muted)">Receive an email automatically when stock
-                                    goes below reorder level</div>
+                                <div style="font-weight:600;font-size:13.5px;color:var(--text)">Automatic Email Alerts
+                                    Enabled</div>
+                                <div style="font-size:12px;color:var(--muted)">Fires automatically on every outbound
+                                    movement that triggers a LOW/CRITICAL level, and every 6 hours</div>
                             </div>
                         </div>
                     </form>
                 </div>
 
-                <!-- ── HOW TO CONFIGURE GMAIL ── -->
-                <div class="form-card fade-in" style="border-left:3px solid var(--primary);">
-                    <div class="section-heading" style="margin-bottom:16px">
-                        <i class="fab fa-google" style="color:#ea4335"></i> Gmail Setup Guide
+                <!-- ── SMTP CONFIGURATION ── -->
+                <div class="form-card fade-in" style="grid-column:1/-1;border-left:3px solid var(--primary)">
+                    <div class="section-heading" style="margin-bottom:8px">
+                        <i class="fab fa-google" style="color:#ea4335"></i> Gmail SMTP Setup
+                        {% if user.smtp_email and user.smtp_pass %}
+                        <span
+                            style="font-size:12px;font-weight:600;color:#34d399;margin-left:12px;background:rgba(52,211,153,.1);padding:3px 10px;border-radius:20px;border:1px solid rgba(52,211,153,.25)">
+                            <i class="fas fa-check-circle"></i> Configured — Auto-alerts are ACTIVE
+                        </span>
+                        {% else %}
+                        <span
+                            style="font-size:12px;font-weight:600;color:#fbbf24;margin-left:12px;background:rgba(251,191,36,.1);padding:3px 10px;border-radius:20px;border:1px solid rgba(251,191,36,.25)">
+                            <i class="fas fa-exclamation-triangle"></i> Not Configured — Fill in below to activate
+                        </span>
+                        {% endif %}
                     </div>
-                    <ol style="color:var(--muted);font-size:13px;line-height:2;padding-left:18px">
-                        <li>Enable <strong style="color:var(--text)">2-Step Verification</strong> on your Google account
-                        </li>
-                        <li>Go to <strong style="color:var(--text)">Google Account → Security → App Passwords</strong>
-                        </li>
-                        <li>Create an App Password for "SmartRefill"</li>
-                        <li>Copy the 16-character password it gives you</li>
-                        <li>Set these environment variables before running Flask:</li>
-                    </ol>
+                    <p style="color:var(--muted);font-size:12.5px;margin-bottom:20px;line-height:1.7">
+                        Enter your Gmail address and a <strong style="color:var(--text)">Gmail App Password</strong>.
+                        This is used as the sender for automatic stock alert emails.
+                        <a href="https://myaccount.google.com/apppasswords" target="_blank"
+                            style="color:var(--primary2)">
+                            <i class="fas fa-external-link-alt"></i> Generate a Gmail App Password →
+                        </a>
+                    </p>
+
+                    <form method="POST" action="/profile">
+                        <input type="hidden" name="action" value="update_email">
+                        <input type="hidden" name="email" value="{{ user.email or '' }}">
+                        <input type="hidden" name="email_alerts" value="{{ '1' if user.email_alerts else '' }}">
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                            <div class="form-group">
+                                <label><i class="fab fa-google" style="color:#ea4335"></i> Gmail Address
+                                    (Sender)</label>
+                                <input type="email" name="smtp_email" class="form-control"
+                                    value="{{ user.smtp_email or '' }}" placeholder="yourgmail@gmail.com">
+                                <small style="color:var(--muted);font-size:11.5px;margin-top:5px;display:block">
+                                    The Gmail account that will send alerts.
+                                </small>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-key"></i> Gmail App Password</label>
+                                <input type="password" name="smtp_pass" class="form-control"
+                                    value="{{ user.smtp_pass or '' }}" placeholder="xxxx xxxx xxxx xxxx"
+                                    autocomplete="new-password">
+                                <small style="color:var(--muted);font-size:11.5px;margin-top:5px;display:block">
+                                    16-char App Password (not your Gmail login password).
+                                </small>
+                            </div>
+                        </div>
+
+                        <div style="display:flex;align-items:center;gap:14px;margin-top:4px">
+                            <button type="submit" class="btn-glow" style="padding:10px 28px">
+                                <i class="fas fa-shield-alt"></i> Save SMTP Settings
+                            </button>
+                            <span style="font-size:12px;color:var(--muted)">
+                                <i class="fas fa-bolt" style="color:#fbbf24"></i>
+                                Alerts fire automatically — no action needed after saving.
+                            </span>
+                        </div>
+                    </form>
+
+                    <!-- Step-by-step guide -->
                     <div
-                        style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-top:12px;font-family:monospace;font-size:12.5px;color:#a78bfa;line-height:2">
-                        set MAIL_USERNAME=you@gmail.com<br>
-                        set MAIL_PASSWORD=xxxx-xxxx-xxxx-xxxx
-                    </div>
-                    <div
-                        style="margin-top:12px;padding:10px 14px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:8px;font-size:12px;color:#6ee7b7">
-                        <i class="fas fa-shield-alt"></i> Your password is never stored in the app — only read from the
-                        environment.
+                        style="margin-top:22px;padding:16px;background:var(--bg);border:1px solid var(--border);border-radius:10px">
+                        <div
+                            style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px;letter-spacing:.5px;text-transform:uppercase">
+                            <i class="fas fa-list-ol"></i> Quick Setup Guide
+                        </div>
+                        <ol style="color:var(--muted);font-size:12.5px;line-height:2.2;padding-left:18px;margin:0">
+                            <li>Enable <strong style="color:var(--text)">2-Step Verification</strong> on your Google
+                                account</li>
+                            <li>Go to <strong style="color:var(--text)">Google Account → Security → App
+                                    Passwords</strong></li>
+                            <li>Create an App Password named <strong style="color:var(--text)">"SmartRefill"</strong>
+                            </li>
+                            <li>Copy the 16-character password — paste it in the field above</li>
+                            <li>Enter your Gmail address and click <strong style="color:var(--text)">Save SMTP
+                                    Settings</strong></li>
+                            <li>Done! 🎉 Alerts will now fire automatically whenever stock runs low</li>
+                        </ol>
                     </div>
                 </div>
 
