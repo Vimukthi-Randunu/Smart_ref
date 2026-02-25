@@ -14,33 +14,196 @@ if (darkModeToggle) {
     // Check for saved preference
     if (localStorage.getItem('darkMode') === 'enabled') {
         document.body.classList.add('dark-mode');
+        // Wait for SmartRefill to be initialized before updating icon if needed
+        // but updateToggleIcon is global so it works
         updateToggleIcon();
     }
 
-    darkModeToggle.addEventListener('click', function() {
-        document.body.classList.toggle('dark-mode');
-        
-        // Save preference
-        if (document.body.classList.contains('dark-mode')) {
-            localStorage.setItem('darkMode', 'enabled');
+    darkModeToggle.addEventListener('click', function () {
+        // Use the exposed function if available, otherwise fallback (though it should be available)
+        if (window.SmartRefill && window.SmartRefill.toggleDarkMode) {
+            window.SmartRefill.toggleDarkMode();
         } else {
-            localStorage.setItem('darkMode', 'disabled');
+            // Fallback just in case
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', document.body.classList.contains('dark-mode') ? 'enabled' : 'disabled');
+            updateToggleIcon();
         }
-        
-        updateToggleIcon();
     });
 }
 
 function updateToggleIcon() {
     const toggle = document.querySelector('.dark-mode-toggle');
     if (!toggle) return;
-    
+
     if (document.body.classList.contains('dark-mode')) {
         toggle.innerHTML = '<i class="fas fa-sun"></i> Light Mode';
     } else {
         toggle.innerHTML = '<i class="fas fa-moon"></i> Dark Mode';
     }
 }
+
+// ============================================================
+// BARCODE SCANNER SUPPORT
+// ============================================================
+
+/**
+ * BarcodeScanner - Detects barcode scanner input
+ * Barcode scanners type very fast (<100ms between chars) and send Enter
+ * This class distinguishes scanner input from manual typing
+ */
+class BarcodeScanner {
+    constructor(inputElement, options = {}) {
+        this.input = inputElement;
+        this.options = {
+            onScan: options.onScan || (() => { }),
+            minLength: options.minLength || 3,
+            scannerThreshold: options.scannerThreshold || 100, // ms between keystrokes
+            enterKeyRequired: options.enterKeyRequired !== false,
+            ...options
+        };
+
+        this.buffer = '';
+        this.lastKeyTime = 0;
+        this.timestamps = [];
+
+        this.init();
+    }
+
+    init() {
+        this.input.addEventListener('keypress', (e) => this.handleKeypress(e));
+        this.input.addEventListener('paste', (e) => this.handlePaste(e));
+    }
+
+    handleKeypress(e) {
+        const currentTime = Date.now();
+        const timeDiff = currentTime - this.lastKeyTime;
+
+        if (e.key === 'Enter') {
+            e.preventDefault();
+
+            // Check if this looks like a scanner input
+            if (this.buffer.length >= this.options.minLength) {
+                const avgTimeDiff = this.getAverageTimeDiff();
+                const isScanner = avgTimeDiff < this.options.scannerThreshold;
+
+                this.options.onScan(this.buffer.trim(), isScanner);
+                this.showFeedback(isScanner ? '✅ Scanned!' : '✓ Entered');
+            }
+
+            this.reset();
+        } else {
+            // Accumulate characters
+            this.buffer += e.key;
+            this.timestamps.push(currentTime);
+        }
+
+        this.lastKeyTime = currentTime;
+    }
+
+    handlePaste(e) {
+        // Pasting simulates scanner for testing
+        const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+        if (pastedText && pastedText.length >= this.options.minLength) {
+            e.preventDefault();
+            this.buffer = pastedText;
+            this.options.onScan(pastedText.trim(), true);
+            this.showFeedback('✅ Scanned!');
+            this.reset();
+        }
+    }
+
+    getAverageTimeDiff() {
+        if (this.timestamps.length < 2) return 0;
+
+        let totalDiff = 0;
+        for (let i = 1; i < this.timestamps.length; i++) {
+            totalDiff += this.timestamps[i] - this.timestamps[i - 1];
+        }
+        return totalDiff / (this.timestamps.length - 1);
+    }
+
+    reset() {
+        this.buffer = '';
+        this.timestamps = [];
+    }
+
+    showFeedback(message) {
+        const indicator = this.input.parentElement.querySelector('.scan-indicator');
+        if (indicator) {
+            const originalText = indicator.textContent;
+            indicator.textContent = message;
+            indicator.classList.add('success');
+
+            setTimeout(() => {
+                indicator.textContent = originalText;
+                indicator.classList.remove('success');
+            }, 2000);
+        }
+    }
+}
+
+// Initialize barcode scanner on product lookup fields
+function initBarcodeScanners() {
+    // Add Product page - barcode input
+    const addProductInput = document.getElementById('barcode-input');
+    if (addProductInput) {
+        new BarcodeScanner(addProductInput, {
+            onScan: (barcode, isScanner) => {
+                // Populate product name field
+                const nameField = document.querySelector('input[name="name"]');
+                if (nameField && !nameField.value) {
+                    nameField.value = barcode;
+                    nameField.focus();
+                }
+            }
+        });
+    }
+
+    // Inbound/Outbound - product lookup
+    const productLookup = document.getElementById('product-lookup');
+    if (productLookup) {
+        new BarcodeScanner(productLookup, {
+            onScan: (barcode, isScanner) => {
+                // Find matching product in dropdown
+                const productSelect = document.querySelector('select[name="name"]');
+                if (productSelect) {
+                    const options = Array.from(productSelect.options);
+                    const match = options.find(opt =>
+                        opt.value.toLowerCase().includes(barcode.toLowerCase())
+                    );
+
+                    if (match) {
+                        productSelect.value = match.value;
+                        productSelect.dispatchEvent(new Event('change'));
+
+                        // Move to quantity field
+                        const qtyField = document.querySelector('input[name="quantity"]');
+                        if (qtyField) qtyField.focus();
+                    } else {
+                        alert(`Product not found: ${barcode}`);
+                    }
+                }
+            }
+        });
+    }
+
+    // Product search - warehouse stock page
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        new BarcodeScanner(searchInput, {
+            onScan: (barcode, isScanner) => {
+                // Trigger search
+                searchInput.value = barcode;
+                searchInput.dispatchEvent(new Event('keyup'));
+            }
+        });
+    }
+}
+
+// Auto-initialize on page load
+document.addEventListener('DOMContentLoaded', initBarcodeScanners);
+
 
 // ============================================================
 // EXPORT TO CSV
@@ -88,7 +251,7 @@ function filterTable(tableSelector, searchInputSelector) {
 
     if (!searchInput || !table) return;
 
-    searchInput.addEventListener('keyup', function() {
+    searchInput.addEventListener('keyup', function () {
         const searchValue = this.value.toLowerCase();
         const rows = table.querySelectorAll('tbody tr');
 
@@ -109,7 +272,7 @@ function filterByCategory(selectSelector, tableSelector) {
 
     if (!categorySelect || !table) return;
 
-    categorySelect.addEventListener('change', function() {
+    categorySelect.addEventListener('change', function () {
         const selectedCategory = this.value.toLowerCase();
         const rows = table.querySelectorAll('tbody tr');
 
@@ -126,10 +289,6 @@ function filterByCategory(selectSelector, tableSelector) {
         });
     });
 }
-
-// ============================================================
-// SHOW ALERT MESSAGE
-// ============================================================
 
 // ============================================================
 // SHOW ALERT MESSAGE
@@ -187,7 +346,7 @@ function validateForm(formSelector) {
 function markFieldError(field, message) {
     const parent = field.closest('.form-group') || field.parentElement;
     parent.classList.add('error');
-    
+
     let errorMsg = parent.querySelector('.form-error');
     if (!errorMsg) {
         errorMsg = document.createElement('div');
@@ -200,7 +359,7 @@ function markFieldError(field, message) {
 function clearFieldError(field) {
     const parent = field.closest('.form-group') || field.parentElement;
     parent.classList.remove('error');
-    
+
     const errorMsg = parent.querySelector('.form-error');
     if (errorMsg) errorMsg.remove();
 }
@@ -210,30 +369,16 @@ function clearFieldError(field) {
 // ============================================================
 
 function confirmDelete(productName) {
-    if (confirm(`Are you sure you want to delete SKU '${productName}'? This action cannot be undone.`)) {
-        return true;
-    }
-    return false;
+    return confirm(`Are you sure you want to delete SKU '${productName}'? This action cannot be undone.`);
 }
 
 // ============================================================
 // HELPER FUNCTIONS
 // ============================================================
 
-function confirmDelete(productName) {
-    if (confirm(`Are you sure you want to delete SKU '${productName}'? This action cannot be undone.`)) {
-        return true;
-    }
-    return false;
-}
-
 // ============================================================
 // INITIALIZATION
 // ============================================================
-
-document.addEventListener('DOMContentLoaded', () => {
-    initializeDarkMode();
-});
 
 // Export functions for use in HTML
 window.SmartRefill = {
@@ -244,6 +389,30 @@ window.SmartRefill = {
     validateForm,
     markFieldError,
     clearFieldError,
-    toggleDarkMode,
-    confirmDelete
+    confirmDelete,
+    toggleDarkMode: function (forceState, instant) {
+        // This is a wrapper to expose the internal logic if needed, 
+        // but the current implementation uses event listeners.
+        // Let's refactor the internal logic to be a callable function first
+        // actually, let's just make the internal logic callable.
+
+        const toggle = document.querySelector('.dark-mode-toggle');
+        if (forceState !== null && forceState !== undefined) {
+            if (forceState) {
+                document.body.classList.add('dark-mode');
+                localStorage.setItem('darkMode', 'enabled');
+            } else {
+                document.body.classList.remove('dark-mode');
+                localStorage.setItem('darkMode', 'disabled');
+            }
+        } else {
+            document.body.classList.toggle('dark-mode');
+            if (document.body.classList.contains('dark-mode')) {
+                localStorage.setItem('darkMode', 'enabled');
+            } else {
+                localStorage.setItem('darkMode', 'disabled');
+            }
+        }
+        updateToggleIcon();
+    }
 };

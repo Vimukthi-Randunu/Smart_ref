@@ -4,120 +4,177 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Refill Alert - Smart Refill</title>
+    <title>Refill Alerts — SmartRefill</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/dark-theme.css">
 </head>
 
 <body>
 
     <aside class="sidebar">
-        <h3>Smart Refill</h3>
-        <nav>
-            <a href="/"><i class="fas fa-chart-line"></i> Dashboard</a>
-            <a href="/products"><i class="fas fa-box"></i> Warehouse Stock</a>
+        <a href="/dashboard" class="sidebar-brand">
+            <div class="logo-icon"><i class="fas fa-cubes"></i></div><span>SmartRefill</span>
+        </a>
+        <nav class="sidebar-nav">
+            <div class="sidebar-label">Main</div>
+            <a href="/dashboard"><i class="fas fa-chart-line"></i> Dashboard</a>
+            <a href="/products"><i class="fas fa-boxes"></i> Warehouse Stock</a>
             <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
-            <a href="/inbound"><i class="fas fa-arrow-down"></i> Inbound</a>
-            <a href="/outbound"><i class="fas fa-arrow-up"></i> Outbound</a>
+            <div class="sidebar-label">Operations</div>
+            <a href="/inbound"><i class="fas fa-arrow-circle-down"></i> Inbound</a>
+            <a href="/outbound"><i class="fas fa-arrow-circle-up"></i> Outbound</a>
+            <a href="/refill" class="active"><i class="fas fa-bell"></i> Refill Alerts</a>
+            <div class="sidebar-label">Analytics</div>
+            <a href="/reports"><i class="fas fa-chart-pie"></i> Reports</a>
             <a href="/history"><i class="fas fa-history"></i> Movement History</a>
-            <a href="/refill"><i class="fas fa-exclamation-circle"></i> Refill Alert</a>
+            <a href="/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
+            <a href="/profile"><i class="fas fa-user-cog"></i> Profile Settings</a>
         </nav>
-
-        <!-- DARK MODE TOGGLE -->
-        <button class="dark-mode-toggle btn" style="margin-bottom: 16px; background-color: var(--secondary);"
-            title="Toggle Dark Mode">
-            <i class="fas fa-moon"></i> Dark Mode
-        </button>
-        <div class="sidebar-user-section">
-            <div class="user-info-card">
-                <div class="user-avatar">
-                    <i class="fas fa-user-circle"></i>
-                </div>
-                <div class="user-details">
-                    <span class="user-name">{{ session.get('username', 'User') }}</span>
-                    <span class="user-role">Warehouse Manager</span>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="user-avatar-circle"><i class="fas fa-user"></i></div>
+                <div>
+                    <div class="uname">{{ session.get('username','User') }}</div>
+                    <div class="urole">Warehouse Manager</div>
                 </div>
             </div>
-            <a href="/logout" class="logout-btn">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
+            <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
         </div>
     </aside>
 
-    <main class="main">
-
-        <header style="margin-bottom: 28px;">
-            <h2><i class="fas fa-exclamation-circle" style="margin-right: 12px; color: #f59e0b;"></i>Priority Refill
-                Dashboard</h2>
-            <p style="color: inherit; margin-top: 4px; opacity: 0.8;">SKUs that need immediate attention for restocking
-            </p>
-        </header>
-
-        {% if products|length == 0 %}
-        <div class="card"
-            style="padding: 40px; text-align: center; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 4px solid #f59e0b;">
-            <i class="fas fa-check-circle" style="font-size: 48px; color: #d97706; margin-bottom: 16px;"></i>
-            <h4 style="color: #92400e; margin-bottom: 8px;">All Stock Levels Healthy</h4>
-            <p style="color: #b45309; margin-bottom: 0;">No SKUs currently require refill. Your inventory is in good
-                shape!</p>
-        </div>
-        {% else %}
-        <div class="card" style="padding: 0;">
-            <div style="overflow-x: auto;">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th><i class="fas fa-cube"></i> SKU</th>
-                            <th><i class="fas fa-boxes"></i> Current Stock</th>
-                            <th><i class="fas fa-exclamation"></i> Reorder Level</th>
-                            <th><i class="fas fa-arrow-trending-down"></i> Recent Sales</th>
-                            <th><i class="fas fa-info-circle"></i> Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for p in products %}
-                        <tr>
-                            <td><strong>{{ p[0] }}</strong></td>
-                            <td>
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span>{{ p[1] }}</span>
-                                    <div
-                                        style="height: 6px; width: 100px; background: #e5e7eb; border-radius: 3px; overflow: hidden;">
-                                        <div
-                                            style="height: 100%; background: {% if p[1] > p[2] %}#10b981{% else %}#ef4444{% endif %}; width: {% if p[1] > 0 %}{{ (p[1] / (p[2] * 2)) * 100 }}%{% else %}5%{% endif %};">
-                                        </div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>{{ p[2] }}</td>
-                            <td><span
-                                    style="background: #e0e7ff; color: #3730a3; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 12px;">{{
-                                    p[3] }}</span></td>
-                            <td>
-                                {% if p[1] <= 0 %} <span class="status critical">CRITICAL</span>
-                                    {% else %}
-                                    <span class="status low">LOW</span>
-                                    {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    <div class="main">
+        <div class="topbar">
+            <div class="topbar-left">
+                <h1><i class="fas fa-bell" style="color:#fbbf24;margin-right:10px"></i>Priority Refill Dashboard</h1>
+                <p>SKUs requiring immediate restocking attention</p>
+            </div>
+            <div class="topbar-right">
+                <form method="POST" action="/send-alert" style="display:inline">
+                    <button type="submit" class="btn-glow" id="btn-send-alert"
+                        style="background:linear-gradient(135deg,#f59e0b,#d97706);box-shadow:0 6px 20px rgba(245,158,11,.35)">
+                        <i class="fas fa-envelope"></i> Send Alert Email
+                    </button>
+                </form>
+                <a href="/products" class="btn-ghost"><i class="fas fa-boxes"></i> View All Stock</a>
             </div>
         </div>
 
-        <div class="action-box"
-            style="margin-top: 24px; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b;">
-            <h6 style="color: #f59e0b; margin-bottom: 8px;"><i class="fas fa-lightbulb"></i> Action Recommended</h6>
-            <p style="margin-bottom: 0; color: #666666; font-size: 13px;">
-                Review the items above and place purchase orders to replenish stock before falling below reorder levels.
-                Timely reordering helps prevent stockouts.
-            </p>
-        </div>
-        {% endif %}
+        <div class="page-body">
 
-    </main>
+            {% if products|length == 0 %}
+            <!-- All good state -->
+            <div class="glass-card fade-in" style="padding:64px;text-align:center;border-top:3px solid var(--green)">
+                <div
+                    style="width:80px;height:80px;background:rgba(52,211,153,.15);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:34px;color:var(--green);margin-bottom:20px">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h3 style="font-size:22px;font-weight:800;margin-bottom:10px">All Stock Levels Healthy!</h3>
+                <p style="color:var(--muted);max-width:400px;margin:0 auto">No SKUs currently require refill. Your
+                    inventory is in great shape.</p>
+            </div>
+
+            {% else %}
+
+            <!-- AI Legend -->
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;align-items:center" class="fade-in">
+                <span style="color:var(--muted);font-size:12px;font-weight:600"><i class="fas fa-robot"
+                        style="color:var(--primary2)"></i> AI Days-Remaining Prediction:</span>
+                <span class="badge-pill"
+                    style="background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.25)">🔴
+                    &lt;3 days — Critical</span>
+                <span class="badge-pill"
+                    style="background:rgba(251,191,36,.15);color:#fbbf24;border:1px solid rgba(251,191,36,.25)">🟡 3–7
+                    days — Warning</span>
+                <span class="badge-pill"
+                    style="background:rgba(52,211,153,.15);color:#34d399;border:1px solid rgba(52,211,153,.25)">🟢 &gt;7
+                    days — Watch</span>
+            </div>
+
+            <!-- Refill Cards Grid -->
+            <div
+                style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-bottom:24px">
+                {% for p in products %}
+                <div class="glass-card fade-in"
+                    style="padding:22px;border-top:3px solid {% if p.quantity <= 0 %}var(--red){% elif p.days_remaining is not none and p.days_remaining < 3 %}var(--red){% elif p.days_remaining is not none and p.days_remaining < 7 %}#fbbf24{% else %}var(--green){% endif %};animation-delay:{{ loop.index0 * 0.05 }}s">
+
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+                        <div>
+                            <div style="font-weight:700;font-size:15px;margin-bottom:4px">{{ p.name }}</div>
+                            {% if p.quantity <= 0 %} <span class="badge-pill badge-critical"><i class="fas fa-fire"></i>
+                                CRITICAL</span>
+                                {% else %}
+                                <span class="badge-pill badge-low"><i class="fas fa-exclamation-triangle"></i> LOW
+                                    STOCK</span>
+                                {% endif %}
+                        </div>
+                        <a href="/inbound?product={{ p.name }}" class="btn-success"
+                            style="padding:8px 14px;font-size:12px;flex-shrink:0"><i class="fas fa-plus"></i>
+                            Restock</a>
+                    </div>
+
+                    <!-- Progress bar -->
+                    <div style="margin-bottom:14px">
+                        <div
+                            style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:5px">
+                            <span>Current Stock</span>
+                            <span><strong style="color:var(--text)">{{ p.quantity }}</strong> / {{ p.reorder * 2 }}
+                                target</span>
+                        </div>
+                        <div class="progress-track" style="width:100%;height:8px">
+                            {% set pct = [(p.quantity / (p.reorder * 2 if p.reorder > 0 else 1) * 100)|int, 100]|min %}
+                            <div class="progress-fill {% if pct < 25 %}fill-red{% elif pct < 50 %}fill-amber{% else %}fill-green{% endif %}"
+                                style="width:{{ pct }}%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Stats row -->
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;font-size:12px">
+                        <div style="text-align:center;background:var(--glass);border-radius:8px;padding:8px">
+                            <div style="color:var(--muted);margin-bottom:3px">Reorder At</div>
+                            <div style="font-weight:700;color:var(--text)">{{ p.reorder }}</div>
+                        </div>
+                        <div style="text-align:center;background:var(--glass);border-radius:8px;padding:8px">
+                            <div style="color:var(--muted);margin-bottom:3px">Avg/Day</div>
+                            <div style="font-weight:700;color:var(--primary2)">{{ p.avg_daily if p.avg_daily > 0 else
+                                '—' }}</div>
+                        </div>
+                        <div style="text-align:center;background:var(--glass);border-radius:8px;padding:8px">
+                            <div style="color:var(--muted);margin-bottom:3px">Days Left</div>
+                            <div
+                                style="font-weight:700;color:{% if p.days_remaining is none %}var(--muted){% elif p.days_remaining < 3 %}var(--red){% elif p.days_remaining < 7 %}#fbbf24{% else %}var(--green){% endif %}">
+                                {% if p.days_remaining is none %}?{% else %}{{ p.days_remaining }}d{% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Suggested order -->
+                    <div
+                        style="margin-top:12px;padding:8px 12px;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.2);border-radius:8px;font-size:12px;display:flex;align-items:center;gap:6px">
+                        <i class="fas fa-robot" style="color:#a78bfa"></i>
+                        <span style="color:var(--muted)">AI suggests ordering:</span>
+                        <strong style="color:#a78bfa;margin-left:auto">{{ p.suggested_qty }} units</strong>
+                    </div>
+
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- AI Explanation -->
+            <div class="info-box fade-in" style="border-left-color:#8b5cf6">
+                <h6 style="color:#a78bfa"><i class="fas fa-robot"></i> How AI Prediction Works</h6>
+                <p>
+                    <strong>Avg Daily Sales</strong> = total outbound in last 30 days ÷ 30 &nbsp;|&nbsp;
+                    <strong>Days Remaining</strong> = current stock ÷ avg daily sales &nbsp;|&nbsp;
+                    <strong>Suggested Order</strong> = enough to cover 14 days of demand minus current stock.
+                </p>
+            </div>
+
+            {% endif %}
+
+        </div>
+    </div>
 
     <script src="/static/enhancements.js"></script>
 </body>

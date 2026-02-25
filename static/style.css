@@ -704,6 +704,97 @@ body.dark-mode .dark-mode-toggle:hover {
 }
 
 /* ============================================================
+   BARCODE SCANNER SUPPORT
+   ============================================================ */
+
+.barcode-input-group {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.barcode-input-group input {
+    padding-right: 140px;
+    /* Make room for indicator */
+}
+
+.scan-indicator {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+    color: var(--gray-500);
+    font-weight: 600;
+    pointer-events: none;
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.scan-indicator.success {
+    color: var(--success);
+    animation: scanSuccess 0.3s ease;
+}
+
+@keyframes scanSuccess {
+    0% {
+        transform: translateY(-50%) scale(0.8);
+        opacity: 0;
+    }
+
+    50% {
+        transform: translateY(-50%) scale(1.1);
+    }
+
+    100% {
+        transform: translateY(-50%) scale(1);
+        opacity: 1;
+    }
+}
+
+/* Barcode input styling */
+#barcode-input,
+#product-lookup {
+    border-left: 4px solid var(--primary);
+    background: linear-gradient(to right, var(--primary-light) 0%, white 10%);
+}
+
+#barcode-input:focus,
+#product-lookup:focus {
+    border-left-color: var(--success);
+    background: white;
+}
+
+/* Dark mode barcode inputs */
+body.dark-mode .barcode-input-group input {
+    background: #1a1f2a;
+    border-color: #2d3748;
+    color: #e8eaed;
+}
+
+body.dark-mode #barcode-input,
+body.dark-mode #product-lookup {
+    border-left-color: #00a8ff;
+    background: linear-gradient(to right, rgba(0, 168, 255, 0.1) 0%, #1a1f2a 10%);
+}
+
+body.dark-mode #barcode-input:focus,
+body.dark-mode #product-lookup:focus {
+    border-left-color: #10b981;
+    background: #1a1f2a;
+}
+
+body.dark-mode .scan-indicator {
+    color: #b0b8c1;
+}
+
+body.dark-mode .scan-indicator.success {
+    color: #10b981;
+}
+
+
+/* ============================================================
    DARK MODE - COMPREHENSIVE PROFESSIONAL STYLING
    ============================================================ */
 

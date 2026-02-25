@@ -4,170 +4,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Movement History - Smart Refill</title>
+    <title>Movement History — SmartRefill</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="/static/dark-theme.css">
 </head>
 
 <body>
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-        <h3>Smart Refill</h3>
-        <nav>
-            <a href="/"><i class="fas fa-chart-line"></i> Dashboard</a>
-            <a href="/products"><i class="fas fa-box"></i> Warehouse Stock</a>
-            <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
-            <a href="/inbound"><i class="fas fa-arrow-down"></i> Inbound</a>
-            <a href="/outbound"><i class="fas fa-arrow-up"></i> Outbound</a>
-            <a href="/history"><i class="fas fa-history"></i> Movement History</a>
-            <a href="/refill"><i class="fas fa-exclamation-circle"></i> Refill Alert</a>
-        </nav>
 
-        <!-- DARK MODE TOGGLE -->
-        <button class="dark-mode-toggle btn" style="margin-bottom: 16px; background-color: var(--secondary);"
-            title="Toggle Dark Mode">
-            <i class="fas fa-moon"></i> Dark Mode
-        </button>
-        <div class="sidebar-user-section">
-            <div class="user-info-card">
-                <div class="user-avatar">
-                    <i class="fas fa-user-circle"></i>
-                </div>
-                <div class="user-details">
-                    <span class="user-name">{{ session.get('username', 'User') }}</span>
-                    <span class="user-role">Warehouse Manager</span>
+    <aside class="sidebar">
+        <a href="/dashboard" class="sidebar-brand">
+            <div class="logo-icon"><i class="fas fa-cubes"></i></div><span>SmartRefill</span>
+        </a>
+        <nav class="sidebar-nav">
+            <div class="sidebar-label">Main</div>
+            <a href="/dashboard"><i class="fas fa-chart-line"></i> Dashboard</a>
+            <a href="/products"><i class="fas fa-boxes"></i> Warehouse Stock</a>
+            <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
+            <div class="sidebar-label">Operations</div>
+            <a href="/inbound"><i class="fas fa-arrow-circle-down"></i> Inbound</a>
+            <a href="/outbound"><i class="fas fa-arrow-circle-up"></i> Outbound</a>
+            <a href="/refill"><i class="fas fa-bell"></i> Refill Alerts</a>
+            <div class="sidebar-label">Analytics</div>
+            <a href="/reports"><i class="fas fa-chart-pie"></i> Reports</a>
+            <a href="/history" class="active"><i class="fas fa-history"></i> Movement History</a>
+            <a href="/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="user-avatar-circle"><i class="fas fa-user"></i></div>
+                <div>
+                    <div class="uname">{{ session.get('username','User') }}</div>
+                    <div class="urole">Warehouse Manager</div>
                 </div>
             </div>
-            <a href="/logout" class="logout-btn">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
+            <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
         </div>
     </aside>
 
-    <!-- MAIN CONTENT -->
-    <main class="main">
-        <!-- HEADER -->
-        <header
-            style="margin-bottom: 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-            <div>
-                <h2><i class="fas fa-history" style="margin-right: 12px;"></i>Stock Movement History</h2>
-                <p style="color: inherit; margin-top: 4px; opacity: 0.8;">Complete audit trail of all inventory
-                    movements</p>
+    <div class="main">
+        <div class="topbar">
+            <div class="topbar-left">
+                <h1><i class="fas fa-history" style="color:var(--primary2);margin-right:10px"></i>Movement History</h1>
+                <p>Complete audit trail of all inventory movements</p>
             </div>
-            <a href="/export" class="btn" style="margin-bottom: 0;">
-                <i class="fas fa-download"></i> Download CSV
-            </a>
-        </header>
-
-        <!-- FILTER BUTTONS -->
-        <div style="margin-bottom: 24px; display: flex; gap: 12px; flex-wrap: wrap;">
-            <a href="/history?days=1" class="filter-btn" id="filter-today">Today</a>
-            <a href="/history?days=7" class="filter-btn" id="filter-7days">Last 7 Days</a>
-            <a href="/history" class="filter-btn" id="filter-all">All Records</a>
-        </div>
-
-        <!-- TABLE CARD -->
-        <div class="card" style="padding: 0; overflow: hidden;">
-            <div style="overflow-x: auto;">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th class="column-number">#</th>
-                            <th><i class="fas fa-hashtag"></i> SKU</th>
-                            <th><i class="fas fa-cube"></i> SKU NAME</th>
-                            <th><i class="fas fa-folder"></i> CATEGORY</th>
-                            <th><i class="fas fa-exchange-alt"></i> MOVEMENT</th>
-                            <th><i class="fas fa-boxes"></i> QUANTITY</th>
-                            <th><i class="fas fa-calendar"></i> DATE & TIME</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if movements|length == 0 %}
-                        <tr>
-                            <td colspan="7" style="text-align: center; padding: 40px; color: #9ca3af;">
-                                <i class="fas fa-inbox"
-                                    style="font-size: 32px; margin-bottom: 12px; display: block;"></i>
-                                <strong>No movement records found</strong>
-                                <p style="margin-top: 8px; color: #6b7280;">Start recording inventory movements to see
-                                    history here.</p>
-                            </td>
-                        </tr>
-                        {% else %}
-                        {% for m in movements %}
-                        <tr>
-                            <!-- Row Number -->
-                            <td class="column-number" style="color: #9ca3af; font-weight: 600;">{{ loop.index }}</td>
-
-                            <!-- SKU ID -->
-                            <td><strong style="color: var(--text-primary);">{{ m[0] if m[0] else 'N/A' }}</strong></td>
-
-                            <!-- SKU Name -->
-                            <td><strong class="sku-name" style="color: var(--text-primary);">{{ m[1] if m[1] else
-                                    'Unknown' }}</strong></td>
-
-                            <!-- Category -->
-                            <td>
-                                <span class="badge" style="background-color: #e0f2fe; color: #0c4a6e;">
-                                    {{ m[2] if m[2] else 'Uncategorized' }}
-                                </span>
-                            </td>
-
-                            <!-- Movement Type -->
-                            <td>
-                                {% if m[3] == "IN" %}
-                                <span
-                                    style="background-color: #d1fae5; color: #065f46; padding: 6px 12px; border-radius: 4px; font-weight: 600; font-size: 12px; display: inline-block;">
-                                    <i class="fas fa-arrow-down"></i> INBOUND
-                                </span>
-                                {% elif m[3] == "OUT" %}
-                                <span
-                                    style="background-color: #e0e7ff; color: #3730a3; padding: 6px 12px; border-radius: 4px; font-weight: 600; font-size: 12px; display: inline-block;">
-                                    <i class="fas fa-arrow-up"></i> OUTBOUND
-                                </span>
-                                {% else %}
-                                <span
-                                    style="background-color: #fef3c7; color: #92400e; padding: 6px 12px; border-radius: 4px; font-weight: 600; font-size: 12px; display: inline-block;">
-                                    {{ m[3] }}
-                                </span>
-                                {% endif %}
-                            </td>
-
-                            <!-- Quantity -->
-                            <td><span style="font-weight: 600; color: var(--text-primary);">{{ m[4] }}</span></td>
-
-                            <!-- Timestamp -->
-                            <td style="color: var(--text-secondary); font-size: 13px;">{{ m[5] }}</td>
-                        </tr>
-                        {% endfor %}
-                        {% endif %}
-                    </tbody>
-                </table>
+            <div class="topbar-right">
+                <a href="/export" class="btn-glow"><i class="fas fa-download"></i> Download CSV</a>
             </div>
         </div>
-    </main>
+
+        <div class="page-body">
+
+            <!-- Filter tabs -->
+            <div class="filter-bar fade-in">
+                <a href="/history?days=1" class="filter-tab" id="f-today"><i class="fas fa-sun"></i> Today</a>
+                <a href="/history?days=7" class="filter-tab" id="f-7"><i class="fas fa-calendar-week"></i> Last 7
+                    Days</a>
+                <a href="/history" class="filter-tab" id="f-all"><i class="fas fa-infinity"></i> All Records</a>
+            </div>
+
+            <!-- Table -->
+            <div class="table-wrapper fade-in">
+                <div class="table-header">
+                    <h3><i class="fas fa-stream" style="color:var(--primary2);margin-right:8px"></i>
+                        Stock Movements
+                        <span style="color:var(--muted);font-weight:500;font-size:12px;margin-left:8px">({{
+                            movements|length }} records)</span>
+                    </h3>
+                </div>
+                <div style="overflow-x:auto">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:40px">#</th>
+                                <th>SKU ID</th>
+                                <th>Product Name</th>
+                                <th>Category</th>
+                                <th>Movement</th>
+                                <th>Quantity</th>
+                                <th>Date &amp; Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if movements|length == 0 %}
+                            <tr>
+                                <td colspan="7">
+                                    <div class="empty-state">
+                                        <i class="fas fa-inbox"></i>
+                                        <h4>No movement records</h4>
+                                        <p>Start recording inbound/outbound transactions to see history here.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            {% for m in movements %}
+                            <tr class="fade-in" style="animation-delay:{{ loop.index0 * 0.02 }}s">
+                                <td class="num-col">{{ loop.index }}</td>
+                                <td><strong style="color:var(--primary2)">{{ m[0] or 'N/A' }}</strong></td>
+                                <td><span class="sku-name">{{ m[1] or 'Unknown' }}</span></td>
+                                <td><span class="badge-pill badge-cat">{{ m[2] or 'Uncategorized' }}</span></td>
+                                <td>
+                                    {% if m[3] == 'IN' %}
+                                    <span class="badge-pill badge-in"><i class="fas fa-arrow-down"></i> INBOUND</span>
+                                    {% elif m[3] == 'OUT' %}
+                                    <span class="badge-pill badge-out"><i class="fas fa-arrow-up"></i> OUTBOUND</span>
+                                    {% else %}
+                                    <span class="badge-pill" style="background:rgba(251,191,36,.15);color:#fbbf24">{{
+                                        m[3] }}</span>
+                                    {% endif %}
+                                </td>
+                                <td><strong style="color:{{ 'var(--green)' if m[3]=='IN' else 'var(--red)' }}">{{ '+ '
+                                        if m[3]=='IN' else '- ' }}{{ m[4] }}</strong></td>
+                                <td style="color:var(--muted);font-size:12.5px"><i class="fas fa-clock"
+                                        style="margin-right:5px"></i>{{ m[5] }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
 
     <script src="{{ url_for('static', filename='enhancements.js') }}"></script>
     <script>
-        // Handle filter button active states
-        document.addEventListener('DOMContentLoaded', function () {
-            const urlParams = new URLSearchParams(window.location.search);
-            const days = urlParams.get('days');
-
-            // Remove active class from all buttons
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-
-            // Add active class based on current filter
-            if (days === '1') {
-                document.getElementById('filter-today').classList.add('active');
-            } else if (days === '7') {
-                document.getElementById('filter-7days').classList.add('active');
-            } else if (!days) {
-                document.getElementById('filter-all').classList.add('active');
-            }
-        });
+        // Active filter tab
+        const params = new URLSearchParams(location.search);
+        const days = params.get('days');
+        document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+        if (days === '1') document.getElementById('f-today').classList.add('active');
+        else if (days === '7') document.getElementById('f-7').classList.add('active');
+        else document.getElementById('f-all').classList.add('active');
     </script>
 </body>
 

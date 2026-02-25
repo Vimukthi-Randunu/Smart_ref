@@ -1,158 +1,195 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit SKU - Smart Refill</title>
+    <title>Edit SKU — SmartRefill</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/dark-theme.css">
 </head>
+
 <body>
 
-<aside class="sidebar">
-    <h3>Smart Refill</h3>
-    <nav>
-        <a href="/"><i class="fas fa-chart-line"></i> Dashboard</a>
-        <a href="/products"><i class="fas fa-box"></i> Warehouse Stock</a>
-        <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
-        <a href="/inbound"><i class="fas fa-arrow-down"></i> Inbound</a>
-        <a href="/outbound"><i class="fas fa-arrow-up"></i> Outbound</a>
-        <a href="/history"><i class="fas fa-history"></i> Movement History</a>
-        <a href="/refill"><i class="fas fa-exclamation-circle"></i> Refill Alert</a>
-    </nav>
-
-    <!-- DARK MODE TOGGLE -->
-    <button class="dark-mode-toggle btn" style="margin-bottom: 16px; background-color: var(--secondary);"
-        title="Toggle Dark Mode">
-        <i class="fas fa-moon"></i> Dark Mode
-    </button>
-</aside>
-
-<main class="main">
-
-<div class="container">
-    <header style="margin-bottom: 28px; text-align: center;">
-        <h2><i class="fas fa-edit" style="margin-right: 12px; color: #0066cc;"></i>Edit SKU</h2>
-        <p style="color: inherit; margin-top: 8px; opacity: 0.8;">Update product details - quantity cannot be edited here</p>
-    </header>
-
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-            <div class="alert alert-{{ category }}" style="margin-bottom: 20px;">
-                <i class="fas fa-{% if category == 'error' %}exclamation-circle{% else %}check-circle{% endif %}"></i>
-                <strong>{{ message }}</strong>
+    <aside class="sidebar">
+        <a href="/dashboard" class="sidebar-brand">
+            <div class="logo-icon"><i class="fas fa-cubes"></i></div><span>SmartRefill</span>
+        </a>
+        <nav class="sidebar-nav">
+            <div class="sidebar-label">Main</div>
+            <a href="/dashboard"><i class="fas fa-chart-line"></i> Dashboard</a>
+            <a href="/products" class="active"><i class="fas fa-boxes"></i> Warehouse Stock</a>
+            <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
+            <div class="sidebar-label">Operations</div>
+            <a href="/inbound"><i class="fas fa-arrow-circle-down"></i> Inbound</a>
+            <a href="/outbound"><i class="fas fa-arrow-circle-up"></i> Outbound</a>
+            <a href="/refill"><i class="fas fa-bell"></i> Refill Alerts</a>
+            <div class="sidebar-label">Analytics</div>
+            <a href="/reports"><i class="fas fa-chart-pie"></i> Reports</a>
+            <a href="/history"><i class="fas fa-history"></i> Movement History</a>
+            <a href="/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="user-avatar-circle"><i class="fas fa-user"></i></div>
+                <div>
+                    <div class="uname">{{ session.get('username','User') }}</div>
+                    <div class="urole">Warehouse Manager</div>
+                </div>
             </div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
+            <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </aside>
 
-    <form method="post" onsubmit="return validateEditProductForm()">
-        <!-- SKU Information Section -->
-        <div style="margin-bottom: 28px;">
-            <h6 style="color: var(--gray-800); margin-bottom: 16px; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px;"><i class="fas fa-info-circle" style="margin-right: 8px;"></i>SKU Information</h6>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <div class="form-group">
-                    <label><i class="fas fa-tag" style="margin-right: 8px;"></i>SKU Name *</label>
-                    <input type="text" id="skuName" name="name" placeholder="e.g., PROD-2024-001" value="{{ product.name }}" required>
-                    <small class="text-muted">Must be unique</small>
-                </div>
-                <div class="form-group">
-                    <label><i class="fas fa-folder" style="margin-right: 8px;"></i>Category *</label>
-                    <select id="category" name="category" required>
-                        <option value="">Select a category</option>
-                        <option value="Electronics" {% if product.category == 'Electronics' %}selected{% endif %}>Electronics</option>
-                        <option value="Hardware" {% if product.category == 'Hardware' %}selected{% endif %}>Hardware</option>
-                        <option value="Software" {% if product.category == 'Software' %}selected{% endif %}>Software</option>
-                        <option value="Accessories" {% if product.category == 'Accessories' %}selected{% endif %}>Accessories</option>
-                        <option value="Other" {% if product.category == 'Other' %}selected{% endif %}>Other</option>
-                    </select>
-                    <small class="text-muted">Choose the product category</small>
-                </div>
+    <div class="main">
+        <div class="topbar">
+            <div class="topbar-left">
+                <h1><i class="fas fa-edit" style="color:var(--blue);margin-right:10px"></i>Edit SKU: {{ product.name }}
+                </h1>
+                <p>Update product details — quantity is managed via Inbound / Outbound</p>
+            </div>
+            <div class="topbar-right">
+                <a href="/products" class="btn-ghost"><i class="fas fa-arrow-left"></i> Back to Stock</a>
             </div>
         </div>
 
-        <!-- Stock Information Section (Read-only) -->
-        <div style="margin-bottom: 28px;">
-            <h6 style="color: var(--gray-800); margin-bottom: 16px; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px;"><i class="fas fa-chart-line" style="margin-right: 8px;"></i>Current Stock (Read-Only)</h6>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <div class="form-group">
-                    <label><i class="fas fa-boxes" style="margin-right: 8px;"></i>Current Quantity</label>
-                    <input type="number" value="{{ product.quantity }}" disabled style="background-color: #f3f4f6; cursor: not-allowed;">
-                    <small class="text-muted">Use Inbound/Outbound to adjust quantity</small>
+        <div class="page-body">
+            <div style="max-width:680px;margin:0 auto">
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}{% for cat, msg in messages %}
+                <div class="flash flash-{{ 'error' if cat=='error' else 'success' }} fade-in">
+                    <i class="fas fa-{{ 'exclamation-circle' if cat=='error' else 'check-circle' }}"></i>{{ msg }}
                 </div>
-                <div class="form-group">
-                    <label><i class="fas fa-chart-area" style="margin-right: 8px;"></i>Total Sales</label>
-                    <input type="number" value="{{ product.sales }}" disabled style="background-color: #f3f4f6; cursor: not-allowed;">
-                    <small class="text-muted">Lifetime outbound count</small>
+                {% endfor %}{% endif %}
+                {% endwith %}
+
+                <div class="form-card fade-in">
+                    <form method="post" onsubmit="return validateEditForm()">
+
+                        <!-- SKU Info -->
+                        <div style="margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid var(--border)">
+                            <div class="section-heading"><i class="fas fa-info-circle"></i> SKU Information</div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                                <div class="form-group">
+                                    <label><i class="fas fa-tag"></i> SKU Name <span
+                                            style="color:var(--red)">*</span></label>
+                                    <input type="text" id="skuName" name="name" class="form-control"
+                                        value="{{ product.name }}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-folder"></i> Category <span
+                                            style="color:var(--red)">*</span></label>
+                                    <select id="category" name="category" class="form-control" required>
+                                        {% set cats =
+                                        ['Electronics','Hardware','Software','Accessories','Grocery','Clothing','Furniture','Books','Toys','Sports','Beauty
+                                        & Personal Care','Home & Garden','Automotive','Health & Wellness','Office
+                                        Supplies','Other'] %}
+                                        {% for c in cats %}
+                                        <option value="{{ c }}" {% if product.category==c %}selected{% endif %}>{{ c }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Current Stock: read-only -->
+                        <div style="margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid var(--border)">
+                            <div class="section-heading"><i class="fas fa-chart-line"></i> Current Stock (Read-Only)
+                            </div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                                <div class="form-group">
+                                    <label><i class="fas fa-boxes"></i> Current Quantity</label>
+                                    <input type="number" class="form-control" value="{{ product.quantity }}" disabled
+                                        style="opacity:.6;cursor:not-allowed">
+                                    <small style="color:var(--muted);font-size:11.5px;margin-top:4px;display:block">Use
+                                        Inbound / Outbound to adjust</small>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-chart-area"></i> Lifetime Sales</label>
+                                    <input type="number" class="form-control" value="{{ product.sales }}" disabled
+                                        style="opacity:.6;cursor:not-allowed">
+                                    <small
+                                        style="color:var(--muted);font-size:11.5px;margin-top:4px;display:block">Total
+                                        units ever dispatched</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Editable settings -->
+                        <div style="margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid var(--border)">
+                            <div class="section-heading"><i class="fas fa-cogs"></i> Inventory Settings</div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                                <div class="form-group">
+                                    <label><i class="fas fa-exclamation-triangle"></i> Reorder Level <span
+                                            style="color:var(--red)">*</span></label>
+                                    <input type="number" id="reorder" name="reorder" class="form-control"
+                                        value="{{ product.reorder }}" min="0" required>
+                                    <small
+                                        style="color:var(--muted);font-size:11.5px;margin-top:4px;display:block">Triggers
+                                        refill alert below this</small>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-coins"></i> Cost per Unit (₹) <span
+                                            style="color:var(--red)">*</span></label>
+                                    <input type="number" id="cost" name="cost" class="form-control"
+                                        value="{{ product.cost }}" min="0" step="0.01" required>
+                                    <small
+                                        style="color:var(--muted);font-size:11.5px;margin-top:4px;display:block">Purchase
+                                        cost per unit</small>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-truck"></i> Preferred Supplier</label>
+                                    <select name="supplier_id" class="form-control">
+                                        <option value="">— No Supplier —</option>
+                                        {% for s in suppliers %}
+                                        <option value="{{ s[0] }}" {% if product.supplier_id==s[0] %}selected{% endif
+                                            %}>{{ s[1] }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="info-box amber" style="margin-bottom:24px">
+                            <h6><i class="fas fa-info-circle"></i> Important Notes</h6>
+                            <ul>
+                                <li><strong>Quantity & Sales</strong> are read-only — use <a href="/inbound"
+                                        style="color:#fbbf24">Inbound</a> / <a href="/outbound"
+                                        style="color:#fbbf24">Outbound</a> to adjust</li>
+                                <li>All movements are permanently logged and cannot be edited</li>
+                            </ul>
+                        </div>
+
+                        <div style="display:flex;gap:12px;flex-wrap:wrap">
+                            <button type="submit" class="btn-edit" style="padding:11px 22px;font-size:14px"><i
+                                    class="fas fa-save"></i> Save Changes</button>
+                            <a href="/products" class="btn-ghost"><i class="fas fa-times"></i> Cancel</a>
+                        </div>
+
+                    </form>
                 </div>
+
             </div>
         </div>
+    </div>
 
-        <!-- Reorder Level Section -->
-        <div style="margin-bottom: 28px;">
-            <h6 style="color: var(--gray-800); margin-bottom: 16px; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px;"><i class="fas fa-exclamation" style="margin-right: 8px;"></i>Reorder Settings</h6>
-            <div class="form-group">
-                <label><i class="fas fa-exclamation" style="margin-right: 8px;"></i>Reorder Level *</label>
-                <input type="number" id="reorder" name="reorder" placeholder="0" min="0" value="{{ product.reorder }}" required>
-                <small class="text-muted">When stock falls below this level, a refill alert is triggered</small>
-            </div>
-        </div>
-
-        <!-- Information Box -->
-        <div class="info-notes-box" style="margin-bottom: 28px; padding: 16px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px; display: inline-block; width: 100%;">
-            <h6 style="color: #92400e; margin-bottom: 8px;"><i class="fas fa-info-circle"></i> Important Notes</h6>
-            <ul style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.6;">
-                <li><strong>Quantity & Sales</strong> are read-only. Use "Inbound" and "Outbound" pages to adjust quantities.</li>
-                <li>You can only edit <strong>Name</strong>, <strong>Category</strong>, and <strong>Reorder Level</strong> here.</li>
-                <li>All movements are tracked in the history and cannot be modified.</li>
-            </ul>
-        </div>
-
-        <!-- Action Buttons -->
-        <div style="display: flex; gap: 12px; margin-top: 28px;">
-            <button type="submit" style="flex: 1; background-color: #0066cc;"><i class="fas fa-save"></i> Save Changes</button>
-            <a href="/products" class="btn" style="background-color: var(--gray-500); flex: 1; text-align: center; margin-bottom: 0;"><i class="fas fa-times-circle"></i> Cancel</a>
-        </div>
-    </form>
-</div>
-
-<script src="/static/enhancements.js"></script>
-<script>
-    function validateEditProductForm() {
-        const skuName = document.getElementById('skuName').value.trim();
-        const category = document.getElementById('category').value.trim();
-        const reorder = parseInt(document.getElementById('reorder').value);
-
-        // Clear previous errors
-        document.querySelectorAll('.form-group').forEach(g => g.classList.remove('error'));
-
-        let isValid = true;
-
-        if (!skuName) {
-            SmartRefill.markFieldError(document.getElementById('skuName'), 'SKU Name is required');
-            isValid = false;
+    <script>
+        function validateEditForm() {
+            const name = document.getElementById('skuName').value.trim();
+            const cat = document.getElementById('category').value;
+            const ro = parseInt(document.getElementById('reorder').value);
+            const cost = parseFloat(document.getElementById('cost').value);
+            if (!name || !cat) { alert('SKU Name and Category are required!'); return false; }
+            if (isNaN(ro) || ro < 0) { alert('Reorder level must be \u2265 0'); return false; }
+            if (isNaN(cost) || cost < 0) { alert('Cost must be \u2265 0'); return false; }
+            return true;
         }
-
-        if (!category) {
-            SmartRefill.markFieldError(document.getElementById('category'), 'Category is required');
-            isValid = false;
-        }
-
-        if (isNaN(reorder) || reorder < 0) {
-            SmartRefill.markFieldError(document.getElementById('reorder'), 'Reorder Level must be a valid non-negative number');
-            isValid = false;
-        }
-
-        return isValid;
-    }
-
-    // Initialize dark mode
-    document.addEventListener('DOMContentLoaded', () => {
-        SmartRefill.toggleDarkMode(null, true);
-    });
-</script>
-
-</main>
+    </script>
+    <script src="/static/enhancements.js"></script>
 </body>
+
 </html>

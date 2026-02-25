@@ -4,125 +4,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inbound Stock - Smart Refill</title>
+    <title>Inbound Stock — SmartRefill</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/dark-theme.css">
 </head>
 
 <body>
 
     <aside class="sidebar">
-        <h3>Smart Refill</h3>
-        <nav>
-            <a href="/"><i class="fas fa-chart-line"></i> Dashboard</a>
-            <a href="/products"><i class="fas fa-box"></i> Warehouse Stock</a>
+        <a href="/dashboard" class="sidebar-brand">
+            <div class="logo-icon"><i class="fas fa-cubes"></i></div><span>SmartRefill</span>
+        </a>
+        <nav class="sidebar-nav">
+            <div class="sidebar-label">Main</div>
+            <a href="/dashboard"><i class="fas fa-chart-line"></i> Dashboard</a>
+            <a href="/products"><i class="fas fa-boxes"></i> Warehouse Stock</a>
             <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
-            <a href="/inbound"><i class="fas fa-arrow-down"></i> Inbound</a>
-            <a href="/outbound"><i class="fas fa-arrow-up"></i> Outbound</a>
+            <div class="sidebar-label">Operations</div>
+            <a href="/inbound" class="active"><i class="fas fa-arrow-circle-down"></i> Inbound</a>
+            <a href="/outbound"><i class="fas fa-arrow-circle-up"></i> Outbound</a>
+            <a href="/refill"><i class="fas fa-bell"></i> Refill Alerts</a>
+            <div class="sidebar-label">Analytics</div>
+            <a href="/reports"><i class="fas fa-chart-pie"></i> Reports</a>
             <a href="/history"><i class="fas fa-history"></i> Movement History</a>
-            <a href="/refill"><i class="fas fa-exclamation-circle"></i> Refill Alert</a>
+            <a href="/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
         </nav>
-
-        <!-- DARK MODE TOGGLE -->
-        <button class="dark-mode-toggle btn" style="margin-bottom: 16px; background-color: var(--secondary);"
-            title="Toggle Dark Mode">
-            <i class="fas fa-moon"></i> Dark Mode
-        </button>
-        <div class="sidebar-user-section">
-            <div class="user-info-card">
-                <div class="user-avatar">
-                    <i class="fas fa-user-circle"></i>
-                </div>
-                <div class="user-details">
-                    <span class="user-name">{{ session.get('username', 'User') }}</span>
-                    <span class="user-role">Warehouse Manager</span>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="user-avatar-circle"><i class="fas fa-user"></i></div>
+                <div>
+                    <div class="uname">{{ session.get('username','User') }}</div>
+                    <div class="urole">Warehouse Manager</div>
                 </div>
             </div>
-            <a href="/logout" class="logout-btn">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
+            <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
         </div>
     </aside>
 
-    <main class="main">
-
-        <div class="container">
-            <header style="margin-bottom: 28px; text-align: center;">
-                <h2><i class="fas fa-arrow-down" style="margin-right: 12px; color: #10b981;"></i>Inbound Stock</h2>
-                <p style="color: inherit; margin-top: 8px; opacity: 0.8;">Record goods received from suppliers</p>
-            </header>
-
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-            {% for category, message in messages %}
-            <div
-                style="margin-bottom: 20px; padding: 16px; border-radius: 8px; {% if category == 'error' %}background-color: #fee2e2; border-left: 4px solid #ef4444; color: #991b1b;{% else %}background-color: #d1fae5; border-left: 4px solid #10b981; color: #065f46;{% endif %}">
-                <i class="fas {% if category == 'error' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %}"
-                    style="margin-right: 10px;"></i>
-                <strong>{{ message }}</strong>
+    <div class="main">
+        <div class="topbar">
+            <div class="topbar-left">
+                <h1><i class="fas fa-arrow-circle-down" style="color:var(--green);margin-right:10px"></i>Inbound Stock
+                </h1>
+                <p>Record goods received from suppliers into the warehouse</p>
             </div>
-            {% endfor %}
-            {% endif %}
-            {% endwith %}
-
-            <form method="post" onsubmit="return validateInbound()">
-                <div style="margin-bottom: 24px;">
-                    <label><i class="fas fa-cube"></i> Select SKU *</label>
-                    <select id="productSelect" name="name" required style="padding: 11px 12px;">
-                        <option value="">-- Choose a SKU --</option>
-                        {% for p in products %}
-                        <option value="{{ p[0] }}">{{ p[0] }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div style="margin-bottom: 24px;">
-                    <label><i class="fas fa-boxes"></i> Quantity Received *</label>
-                    <input type="number" id="quantityInput" name="quantity" placeholder="Enter quantity" min="1"
-                        required>
-                </div>
-
-                <div style="display: flex; gap: 12px;">
-                    <button type="submit"><i class="fas fa-check-circle"></i> Record Inbound</button>
-                    <a href="/products" class="btn" style="background-color: #6b7280; margin-bottom: 0;"><i
-                            class="fas fa-arrow-left"></i> Cancel</a>
-                </div>
-            </form>
-
-            <script>
-                function validateInbound() {
-                    const productSelect = document.getElementById('productSelect');
-                    const quantityInput = document.getElementById('quantityInput');
-
-                    if (!productSelect.value) {
-                        alert('Please select a SKU');
-                        return false;
-                    }
-
-                    const quantity = parseInt(quantityInput.value);
-                    if (isNaN(quantity) || quantity <= 0) {
-                        alert('Quantity must be a positive number');
-                        return false;
-                    }
-
-                    return true;
-                }
-            </script>
-
-            <div class="info-box"
-                style="margin-top: 40px; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981;">
-                <h6 style="color: #10b981; margin-bottom: 12px;"><i class="fas fa-info-circle"></i> Inbound Information
-                </h6>
-                <ul style="margin-bottom: 0; color: #666666; font-size: 13px;">
-                    <li>Inbound records increase your stock quantity</li>
-                    <li>Enter the exact quantity received from supplier</li>
-                    <li>This activity is logged for audit purposes</li>
-                </ul>
+            <div class="topbar-right">
+                <a href="/products" class="btn-ghost"><i class="fas fa-arrow-left"></i> Back to Stock</a>
             </div>
         </div>
 
-    </main>
+        <div class="page-body">
+            <div style="max-width:600px;margin:0 auto">
 
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}{% for cat, msg in messages %}
+                <div class="flash flash-{{ 'error' if cat=='error' else 'success' }} fade-in">
+                    <i class="fas fa-{{ 'exclamation-circle' if cat=='error' else 'check-circle' }}"></i>{{ msg }}
+                </div>
+                {% endfor %}{% endif %}
+                {% endwith %}
+
+                <!-- Hero indicator -->
+                <div class="glass-card fade-in"
+                    style="padding:24px 28px;margin-bottom:24px;border-top:3px solid var(--green);display:flex;gap:16px;align-items:center">
+                    <div
+                        style="width:52px;height:52px;background:rgba(52,211,153,.15);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--green);flex-shrink:0">
+                        <i class="fas fa-arrow-down"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight:700;font-size:15px;margin-bottom:3px">Recording Goods Receipt</div>
+                        <div style="color:var(--muted);font-size:13px">Select a SKU and enter the quantity received.
+                            Stock will be incremented immediately.</div>
+                    </div>
+                </div>
+
+                <div class="form-card fade-in">
+                    <form method="post" onsubmit="return validateInbound()">
+
+                        <!-- Barcode lookup -->
+                        <div class="form-group">
+                            <label><i class="fas fa-barcode"></i> Scan / Search SKU</label>
+                            <div class="barcode-input-group" style="position:relative">
+                                <input type="text" id="product-lookup" class="form-control"
+                                    placeholder="Scan barcode or type product name…" autofocus autocomplete="off">
+                                <span class="scan-indicator"
+                                    style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:12px;pointer-events:none">
+                                    <i class="fas fa-camera"></i> Ready
+                                </span>
+                            </div>
+                            <small style="color:var(--muted);font-size:12px;display:block;margin-top:5px">Scan to
+                                auto-select, or choose manually below</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label><i class="fas fa-cube"></i> Select SKU <span
+                                    style="color:var(--red)">*</span></label>
+                            <select id="productSelect" name="name" required class="form-control">
+                                <option value="">— Choose a SKU —</option>
+                                {% for p in products %}
+                                <option value="{{ p[0] }}">{{ p[0] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label><i class="fas fa-boxes"></i> Quantity Received <span
+                                    style="color:var(--red)">*</span></label>
+                            <input type="number" id="quantityInput" name="quantity" class="form-control"
+                                placeholder="e.g. 100" min="1" required>
+                        </div>
+
+                        <div style="display:flex;gap:12px;flex-wrap:wrap">
+                            <button type="submit" class="btn-success"><i class="fas fa-check-circle"></i> Record
+                                Inbound</button>
+                            <a href="/products" class="btn-ghost"><i class="fas fa-times"></i> Cancel</a>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="info-box green fade-in" style="margin-top:20px">
+                    <h6><i class="fas fa-info-circle"></i> Inbound Information</h6>
+                    <ul>
+                        <li>Inbound records <strong>increase</strong> your stock quantity</li>
+                        <li>Enter the exact quantity received from the supplier</li>
+                        <li>Every inbound action is logged for audit purposes</li>
+                    </ul>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function validateInbound() {
+            const sel = document.getElementById('productSelect').value;
+            const qty = parseInt(document.getElementById('quantityInput').value);
+            if (!sel) { alert('Please select a SKU'); return false; }
+            if (!qty || qty <= 0) { alert('Quantity must be a positive number'); return false; }
+            return true;
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            const product = new URLSearchParams(location.search).get('product');
+            if (product) {
+                const sel = document.getElementById('productSelect');
+                sel.value = product;
+                sel.style.borderColor = 'var(--green)';
+            }
+        });
+    </script>
     <script src="/static/enhancements.js"></script>
 </body>
 

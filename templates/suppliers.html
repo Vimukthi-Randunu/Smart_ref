@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suppliers — SmartRefill</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/dark-theme.css">
+</head>
+
+<body>
+
+    <aside class="sidebar">
+        <a href="/dashboard" class="sidebar-brand">
+            <div class="logo-icon"><i class="fas fa-cubes"></i></div><span>SmartRefill</span>
+        </a>
+        <nav class="sidebar-nav">
+            <div class="sidebar-label">Main</div>
+            <a href="/dashboard"><i class="fas fa-chart-line"></i> Dashboard</a>
+            <a href="/products"><i class="fas fa-boxes"></i> Warehouse Stock</a>
+            <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
+            <div class="sidebar-label">Operations</div>
+            <a href="/inbound"><i class="fas fa-arrow-circle-down"></i> Inbound</a>
+            <a href="/outbound"><i class="fas fa-arrow-circle-up"></i> Outbound</a>
+            <a href="/refill"><i class="fas fa-bell"></i> Refill Alerts</a>
+            <div class="sidebar-label">Analytics</div>
+            <a href="/reports"><i class="fas fa-chart-pie"></i> Reports</a>
+            <a href="/history"><i class="fas fa-history"></i> Movement History</a>
+            <a href="/suppliers" class="active"><i class="fas fa-truck"></i> Suppliers</a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="user-avatar-circle"><i class="fas fa-user"></i></div>
+                <div>
+                    <div class="uname">{{ session.get('username','User') }}</div>
+                    <div class="urole">Warehouse Manager</div>
+                </div>
+            </div>
+            <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </aside>
+
+    <div class="main">
+        <div class="topbar">
+            <div class="topbar-left">
+                <h1><i class="fas fa-truck" style="color:var(--primary2);margin-right:10px"></i>Supplier Management</h1>
+                <p>Manage vendors, contacts, and delivery information</p>
+            </div>
+        </div>
+
+        <div class="page-body">
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for cat, msg in messages %}
+            <div class="flash flash-{{ 'error' if cat=='error' else 'success' }} fade-in">
+                <i class="fas fa-{{ 'exclamation-circle' if cat=='error' else 'check-circle' }}"></i>{{ msg }}
+            </div>
+            {% endfor %}{% endif %}
+            {% endwith %}
+
+            <div style="display:grid;grid-template-columns:340px 1fr;gap:24px;align-items:start">
+
+                <!-- ── ADD / EDIT FORM ── -->
+                <div class="form-card fade-in" style="position:sticky;top:80px">
+                    <h3 class="section-heading" style="margin-bottom:22px">
+                        {% if edit_supplier %}
+                        <i class="fas fa-edit"></i> Edit Supplier
+                        {% else %}
+                        <i class="fas fa-plus-circle"></i> Add New Supplier
+                        {% endif %}
+                    </h3>
+
+                    <form method="POST"
+                        action="{% if edit_supplier %}/suppliers/edit/{{ edit_supplier[0] }}{% else %}/suppliers{% endif %}">
+
+                        <div class="form-group">
+                            <label><i class="fas fa-building"></i> Supplier Name <span
+                                    style="color:var(--red)">*</span></label>
+                            <input type="text" name="name" class="form-control" placeholder="e.g. Acme Corp"
+                                value="{{ edit_supplier[1] if edit_supplier else '' }}" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label><i class="fas fa-user"></i> Contact Person</label>
+                            <input type="text" name="contact" class="form-control" placeholder="e.g. John Doe"
+                                value="{{ edit_supplier[2] if edit_supplier else '' }}">
+                        </div>
+
+                        <div class="form-group">
+                            <label><i class="fas fa-phone"></i> Phone</label>
+                            <input type="text" name="phone" class="form-control" placeholder="+91 9876543210"
+                                value="{{ edit_supplier[3] if edit_supplier else '' }}">
+                        </div>
+
+                        <div class="form-group">
+                            <label><i class="fas fa-envelope"></i> Email</label>
+                            <input type="email" name="email" class="form-control" placeholder="sales@acme.com"
+                                value="{{ edit_supplier[4] if edit_supplier else '' }}">
+                        </div>
+
+                        <div class="form-group">
+                            <label><i class="fas fa-map-marker-alt"></i> Address</label>
+                            <textarea name="address" class="form-control" rows="3"
+                                placeholder="Full address…">{{ edit_supplier[5] if edit_supplier else '' }}</textarea>
+                        </div>
+
+                        <div style="display:flex;gap:10px;flex-wrap:wrap">
+                            <button type="submit" class="btn-glow">
+                                <i class="fas fa-{{ 'save' if edit_supplier else 'plus' }}"></i>
+                                {{ 'Update Supplier' if edit_supplier else 'Add Supplier' }}
+                            </button>
+                            {% if edit_supplier %}
+                            <a href="/suppliers" class="btn-ghost"><i class="fas fa-times"></i> Cancel</a>
+                            {% endif %}
+                        </div>
+
+                    </form>
+                </div>
+
+                <!-- ── SUPPLIERS LIST ── -->
+                <div class="table-wrapper fade-in">
+                    <div class="table-header">
+                        <h3><i class="fas fa-list" style="color:var(--primary2);margin-right:8px"></i>
+                            Suppliers List
+                            <span style="color:var(--muted);font-weight:500;font-size:12px;margin-left:8px">({{
+                                suppliers|length }} vendors)</span>
+                        </h3>
+                    </div>
+                    <div style="overflow-x:auto">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Supplier</th>
+                                    <th>Contact Person</th>
+                                    <th>Phone</th>
+                                    <th>Email</th>
+                                    <th style="text-align:right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if suppliers|length == 0 and not edit_supplier %}
+                                <tr>
+                                    <td colspan="5">
+                                        <div class="empty-state">
+                                            <i class="fas fa-truck"></i>
+                                            <h4>No suppliers yet</h4>
+                                            <p>Add your first supplier using the form on the left.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                {% for s in suppliers %}
+                                <tr>
+                                    <td>
+                                        <div class="sku-name">{{ s[1] }}</div>
+                                        {% if s[5] %}<div style="color:var(--muted);font-size:12px;margin-top:2px"><i
+                                                class="fas fa-map-marker-alt" style="margin-right:4px"></i>{{ s[5] }}
+                                        </div>{% endif %}
+                                    </td>
+                                    <td style="color:var(--muted)">{{ s[2] or '—' }}</td>
+                                    <td style="color:var(--muted)">
+                                        {% if s[3] %}<i class="fas fa-phone"
+                                            style="color:var(--primary2);margin-right:5px;font-size:11px"></i>{{ s[3]
+                                        }}{% else %}—{% endif %}
+                                    </td>
+                                    <td style="color:var(--muted)">
+                                        {% if s[4] %}<i class="fas fa-envelope"
+                                            style="color:var(--primary2);margin-right:5px;font-size:11px"></i>{{ s[4]
+                                        }}{% else %}—{% endif %}
+                                    </td>
+                                    <td style="text-align:right">
+                                        <div style="display:flex;gap:6px;justify-content:flex-end">
+                                            <a href="/suppliers/edit/{{ s[0] }}" class="btn-edit"><i
+                                                    class="fas fa-edit"></i></a>
+                                            <button onclick="confirmDelete({{ s[0] }},'{{ s[1] }}')" class="btn-danger"
+                                                style="padding:7px 13px;font-size:12px"><i
+                                                    class="fas fa-trash-alt"></i></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function confirmDelete(id, name) {
+            if (confirm(`Delete supplier "${name}"?\nThis cannot be undone.`)) {
+                const f = document.createElement('form'); f.method = 'POST'; f.action = `/suppliers/delete/${id}`;
+                document.body.appendChild(f); f.submit();
+            }
+        }
+    </script>
+    <script src="/static/enhancements.js"></script>
+</body>
+
+</html>

@@ -4,238 +4,237 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add New SKU - Smart Refill</title>
+    <title>Add New SKU — SmartRefill</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/dark-theme.css">
 </head>
 
 <body>
 
     <aside class="sidebar">
-        <h3>Smart Refill</h3>
-        <nav>
-            <a href="/"><i class="fas fa-chart-line"></i> Dashboard</a>
-            <a href="/products"><i class="fas fa-box"></i> Warehouse Stock</a>
-            <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
-            <a href="/inbound"><i class="fas fa-arrow-down"></i> Inbound</a>
-            <a href="/outbound"><i class="fas fa-arrow-up"></i> Outbound</a>
+        <a href="/dashboard" class="sidebar-brand">
+            <div class="logo-icon"><i class="fas fa-cubes"></i></div><span>SmartRefill</span>
+        </a>
+        <nav class="sidebar-nav">
+            <div class="sidebar-label">Main</div>
+            <a href="/dashboard"><i class="fas fa-chart-line"></i> Dashboard</a>
+            <a href="/products"><i class="fas fa-boxes"></i> Warehouse Stock</a>
+            <a href="/add" class="active"><i class="fas fa-plus-circle"></i> Add SKU</a>
+            <div class="sidebar-label">Operations</div>
+            <a href="/inbound"><i class="fas fa-arrow-circle-down"></i> Inbound</a>
+            <a href="/outbound"><i class="fas fa-arrow-circle-up"></i> Outbound</a>
+            <a href="/refill"><i class="fas fa-bell"></i> Refill Alerts</a>
+            <div class="sidebar-label">Analytics</div>
+            <a href="/reports"><i class="fas fa-chart-pie"></i> Reports</a>
             <a href="/history"><i class="fas fa-history"></i> Movement History</a>
-            <a href="/refill"><i class="fas fa-exclamation-circle"></i> Refill Alert</a>
+            <a href="/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
         </nav>
-
-        <!-- DARK MODE TOGGLE -->
-        <button class="dark-mode-toggle btn" style="margin-bottom: 16px; background-color: var(--secondary);"
-            title="Toggle Dark Mode">
-            <i class="fas fa-moon"></i> Dark Mode
-        </button>
-        <div class="sidebar-user-section">
-            <div class="user-info-card">
-                <div class="user-avatar">
-                    <i class="fas fa-user-circle"></i>
-                </div>
-                <div class="user-details">
-                    <span class="user-name">{{ session.get('username', 'User') }}</span>
-                    <span class="user-role">Warehouse Manager</span>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="user-avatar-circle"><i class="fas fa-user"></i></div>
+                <div>
+                    <div class="uname">{{ session.get('username','User') }}</div>
+                    <div class="urole">Warehouse Manager</div>
                 </div>
             </div>
-            <a href="/logout" class="logout-btn">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
+            <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
         </div>
     </aside>
 
-    <main class="main">
-
-        <div class="container">
-            <header style="margin-bottom: 28px; text-align: center;">
-                <h2><i class="fas fa-plus-circle" style="margin-right: 12px; color: var(--success);"></i>Add New SKU
-                </h2>
-                <p style="color: inherit; margin-top: 8px; opacity: 0.8;">Add a new product to your warehouse inventory
-                </p>
-            </header>
-
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-            {% for category, message in messages %}
-            <div class="alert alert-{{ category }}" style="margin-bottom: 20px;">
-                <i class="fas fa-{% if category == 'error' %}exclamation-circle{% else %}check-circle{% endif %}"></i>
-                <strong>{{ message }}</strong>
+    <div class="main">
+        <div class="topbar">
+            <div class="topbar-left">
+                <h1><i class="fas fa-plus-circle" style="color:var(--green);margin-right:10px"></i>Add New SKU</h1>
+                <p>Register a new product in the warehouse inventory</p>
             </div>
-            {% endfor %}
-            {% endif %}
-            {% endwith %}
-
-            <form method="post" onsubmit="return validateAddProductForm()">
-                <!-- SKU Information Section -->
-                <div style="margin-bottom: 28px;">
-                    <h6
-                        style="color: var(--gray-800); margin-bottom: 16px; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px;">
-                        <i class="fas fa-info-circle" style="margin-right: 8px;"></i>SKU Information</h6>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                        <div class="form-group">
-                            <label><i class="fas fa-tag" style="margin-right: 8px;"></i>SKU Name *</label>
-                            <input type="text" id="skuName" name="name" placeholder="e.g., PROD-2024-001" required>
-                            <small class="text-muted">Must be unique and descriptive</small>
-                        </div>
-                        <div class="form-group">
-                            <label><i class="fas fa-folder" style="margin-right: 8px;"></i>Category *</label>
-                            <select id="category" name="category" required>
-                                <option value="">Select a category</option>
-                                <option value="Electronics">Electronics</option>
-                                <option value="Hardware">Hardware</option>
-                                <option value="Software">Software</option>
-                                <option value="Accessories">Accessories</option>
-                                <option value="Grocery">Grocery</option>
-                                <option value="Clothing">Clothing</option>
-                                <option value="Furniture">Furniture</option>
-                                <option value="Books">Books</option>
-                                <option value="Toys">Toys</option>
-                                <option value="Sports">Sports</option>
-                                <option value="Beauty">Beauty & Personal Care</option>
-                                <option value="Home">Home & Garden</option>
-                                <option value="Automotive">Automotive</option>
-                                <option value="Health">Health & Wellness</option>
-                                <option value="Office">Office Supplies</option>
-                                <option value="Other">Other</option>
-                            </select>
-                            <small class="text-muted">Choose the product category</small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Stock Information Section -->
-                <div style="margin-bottom: 28px;">
-                    <h6
-                        style="color: var(--gray-800); margin-bottom: 16px; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px;">
-                        <i class="fas fa-chart-line" style="margin-right: 8px;"></i>Stock Information</h6>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                        <div class="form-group">
-                            <label><i class="fas fa-boxes" style="margin-right: 8px;"></i>Initial Quantity *</label>
-                            <input type="number" id="quantity" name="quantity" placeholder="0" min="0" value="0"
-                                required oninput="updatePreview()">
-                            <small class="text-muted">Starting inventory count</small>
-                        </div>
-                        <div class="form-group">
-                            <label><i class="fas fa-exclamation" style="margin-right: 8px;"></i>Reorder Level *</label>
-                            <input type="number" id="reorder" name="reorder" placeholder="0" min="0" value="0" required
-                                oninput="updatePreview()">
-                            <small class="text-muted">Triggers refill alerts</small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Stock Level Preview -->
-                <div class="card"
-                    style="padding: 16px; margin-bottom: 28px; background-color: #f0f9ff; border-left: 4px solid var(--primary);">
-                    <h6 style="margin-bottom: 12px; color: var(--primary);"><i class="fas fa-chart-pie"
-                            style="margin-right: 8px;"></i>Stock Level Preview</h6>
-                    <div style="display: flex; align-items: center; gap: 16px;">
-                        <div style="flex: 1;">
-                            <div class="progress" style="height: 12px;">
-                                <div class="progress-bar" id="stockPreviewBar" style="width: 0%;"></div>
-                            </div>
-                        </div>
-                        <span id="stockPercentage" style="font-weight: 600; font-size: 14px; min-width: 50px;">0%</span>
-                    </div>
-                    <p id="stockStatus" style="margin: 12px 0 0 0; font-size: 12px; color: #1e40af;"></p>
-                </div>
-
-                <!-- Action Buttons -->
-                <div style="display: flex; gap: 12px; margin-top: 28px;">
-                    <button type="submit" style="flex: 1; background-color: var(--success);"><i
-                            class="fas fa-check-circle"></i> Add SKU</button>
-                    <a href="/products" class="btn"
-                        style="background-color: var(--gray-500); flex: 1; text-align: center; margin-bottom: 0;"><i
-                            class="fas fa-times-circle"></i> Cancel</a>
-                </div>
-            </form>
-
-            <!-- Information Box -->
-            <div class="info-tips-box"
-                style="margin-top: 40px; padding: 20px; background: #eff6ff; border-radius: 8px; border-left: 4px solid var(--primary); display: inline-block; width: 100%;">
-                <h6 style="color: var(--primary); margin-bottom: 12px;"><i class="fas fa-lightbulb"></i> Important Tips
-                </h6>
-                <ul style="margin-bottom: 0; color: #1e40af; font-size: 13px; line-height: 1.8;">
-                    <li><strong>SKU Name:</strong> Must be unique. Use a format like PROD-2024-001</li>
-                    <li><strong>Category:</strong> Choose from predefined categories for better organization</li>
-                    <li><strong>Initial Quantity:</strong> Current stock level in your warehouse</li>
-                    <li><strong>Reorder Level:</strong> When stock falls below this, a refill alert is triggered</li>
-                    <li><strong>Best Practice:</strong> Set reorder level to 2-3 weeks of average usage</li>
-                </ul>
+            <div class="topbar-right">
+                <a href="/products" class="btn-ghost"><i class="fas fa-arrow-left"></i> Back to Stock</a>
             </div>
         </div>
 
-        <script src="/static/enhancements.js"></script>
-        <script>
-            function validateAddProductForm() {
-                const skuName = document.getElementById('skuName').value.trim();
-                const category = document.getElementById('category').value.trim();
-                const quantity = parseInt(document.getElementById('quantity').value);
-                const reorder = parseInt(document.getElementById('reorder').value);
+        <div class="page-body">
+            <div style="max-width:680px;margin:0 auto">
 
-                // Clear previous errors
-                document.querySelectorAll('.form-group').forEach(g => g.classList.remove('error'));
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}{% for cat, msg in messages %}
+                <div class="flash flash-{{ 'error' if cat=='error' else 'success' }} fade-in">
+                    <i class="fas fa-{{ 'exclamation-circle' if cat=='error' else 'check-circle' }}"></i>{{ msg }}
+                </div>
+                {% endfor %}{% endif %}
+                {% endwith %}
 
-                let isValid = true;
+                <div class="form-card fade-in">
+                    <form method="post" onsubmit="return validateAddForm()">
 
-                if (!skuName) {
-                    SmartRefill.markFieldError(document.getElementById('skuName'), 'SKU Name is required');
-                    isValid = false;
-                }
+                        <!-- Barcode scanner -->
+                        <div style="margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid var(--border)">
+                            <div class="section-heading"><i class="fas fa-barcode"></i> Barcode / Auto-fill</div>
+                            <div style="position:relative">
+                                <input type="text" id="barcode-input" class="form-control"
+                                    placeholder="📷  Scan barcode or start typing…" autocomplete="off" autofocus>
+                                <span
+                                    style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:12px;pointer-events:none"><i
+                                        class="fas fa-camera"></i> Ready</span>
+                            </div>
+                            <small style="color:var(--muted);font-size:12px;display:block;margin-top:5px">Scan to
+                                auto-populate name, or fill in fields manually below</small>
+                        </div>
 
-                if (!category) {
-                    SmartRefill.markFieldError(document.getElementById('category'), 'Category is required');
-                    isValid = false;
-                }
+                        <!-- SKU Info -->
+                        <div style="margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid var(--border)">
+                            <div class="section-heading"><i class="fas fa-info-circle"></i> SKU Information</div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                                <div class="form-group">
+                                    <label><i class="fas fa-tag"></i> SKU Name <span
+                                            style="color:var(--red)">*</span></label>
+                                    <input type="text" id="skuName" name="name" class="form-control"
+                                        placeholder="e.g. PROD-2024-001" required>
+                                    <small style="color:var(--muted);font-size:11.5px;margin-top:4px;display:block">Must
+                                        be unique and descriptive</small>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-folder"></i> Category <span
+                                            style="color:var(--red)">*</span></label>
+                                    <select id="category" name="category" class="form-control" required>
+                                        <option value="">— Select a category —</option>
+                                        <option>Electronics</option>
+                                        <option>Hardware</option>
+                                        <option>Software</option>
+                                        <option>Accessories</option>
+                                        <option>Grocery</option>
+                                        <option>Clothing</option>
+                                        <option>Furniture</option>
+                                        <option>Books</option>
+                                        <option>Toys</option>
+                                        <option>Sports</option>
+                                        <option>Beauty &amp; Personal Care</option>
+                                        <option>Home &amp; Garden</option>
+                                        <option>Automotive</option>
+                                        <option>Health &amp; Wellness</option>
+                                        <option>Office Supplies</option>
+                                        <option>Other</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
 
-                if (isNaN(quantity) || quantity < 0) {
-                    SmartRefill.markFieldError(document.getElementById('quantity'), 'Quantity must be a valid non-negative number');
-                    isValid = false;
-                }
+                        <!-- Stock Info -->
+                        <div style="margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid var(--border)">
+                            <div class="section-heading"><i class="fas fa-chart-bar"></i> Stock Information</div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                                <div class="form-group">
+                                    <label><i class="fas fa-boxes"></i> Initial Quantity <span
+                                            style="color:var(--red)">*</span></label>
+                                    <input type="number" id="quantity" name="quantity" class="form-control"
+                                        placeholder="0" min="0" value="0" required oninput="updatePreview()">
+                                    <small
+                                        style="color:var(--muted);font-size:11.5px;margin-top:4px;display:block">Starting
+                                        inventory count</small>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-exclamation-triangle"></i> Reorder Level <span
+                                            style="color:var(--red)">*</span></label>
+                                    <input type="number" id="reorder" name="reorder" class="form-control"
+                                        placeholder="0" min="0" value="0" required oninput="updatePreview()">
+                                    <small
+                                        style="color:var(--muted);font-size:11.5px;margin-top:4px;display:block">Triggers
+                                        refill alert below this</small>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-coins"></i> Cost per Unit (₹) <span
+                                            style="color:var(--red)">*</span></label>
+                                    <input type="number" id="cost" name="cost" class="form-control" placeholder="0.00"
+                                        min="0" step="0.01" value="0.00" required>
+                                    <small
+                                        style="color:var(--muted);font-size:11.5px;margin-top:4px;display:block">Purchase
+                                        cost per single unit</small>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-truck"></i> Preferred Supplier</label>
+                                    <select name="supplier_id" class="form-control">
+                                        <option value="">— No Supplier —</option>
+                                        {% for s in suppliers %}
+                                        <option value="{{ s[0] }}">{{ s[1] }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
 
-                if (isNaN(reorder) || reorder < 0) {
-                    SmartRefill.markFieldError(document.getElementById('reorder'), 'Reorder Level must be a valid non-negative number');
-                    isValid = false;
-                }
+                            <!-- Preview bar -->
+                            <div
+                                style="background:var(--glass);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-top:8px">
+                                <div
+                                    style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                                    <span style="font-size:12px;font-weight:600;color:var(--muted)"><i
+                                            class="fas fa-chart-pie"></i> Stock Level Preview</span>
+                                    <span id="stockPct"
+                                        style="font-size:13px;font-weight:700;color:var(--text)">0%</span>
+                                </div>
+                                <div class="progress-track" style="width:100%;height:8px">
+                                    <div id="previewBar" class="progress-fill fill-red" style="width:0%"></div>
+                                </div>
+                                <div id="stockStatusTxt" style="margin-top:6px;font-size:12px;color:var(--muted)"></div>
+                            </div>
+                        </div>
 
-                if (isValid) {
-                    SmartRefill.showAlert('SKU added successfully!', 'success', 2000);
-                }
+                        <div style="display:flex;gap:12px;flex-wrap:wrap">
+                            <button type="submit" class="btn-success"><i class="fas fa-check-circle"></i> Add
+                                SKU</button>
+                            <a href="/products" class="btn-ghost"><i class="fas fa-times"></i> Cancel</a>
+                        </div>
 
-                return isValid;
-            }
+                    </form>
+                </div>
 
-            function updatePreview() {
-                const quantity = parseInt(document.getElementById('quantity').value) || 0;
-                const reorder = parseInt(document.getElementById('reorder').value) || 1;
+                <div class="info-box fade-in" style="margin-top:20px">
+                    <h6><i class="fas fa-lightbulb"></i> Tips for Adding SKUs</h6>
+                    <ul>
+                        <li><strong>SKU Name</strong> must be unique. Use a structured format like <code
+                                style="background:rgba(255,255,255,.1);padding:2px 6px;border-radius:4px">PROD-2024-001</code>
+                        </li>
+                        <li><strong>Reorder Level</strong> should typically be 2–3 weeks of average usage</li>
+                        <li><strong>Cost per Unit</strong> is used to calculate total inventory value</li>
+                    </ul>
+                </div>
 
-                const percentage = Math.min((quantity / reorder * 100), 100);
-                document.getElementById('stockPreviewBar').style.width = percentage + '%';
-                document.getElementById('stockPercentage').textContent = Math.round(percentage) + '%';
+            </div>
+        </div>
+    </div>
 
-                let statusText = '';
-                let statusColor = '';
+    <script>
+        function updatePreview() {
+            const qty = parseInt(document.getElementById('quantity').value) || 0;
+            const ro = parseInt(document.getElementById('reorder').value) || 1;
+            const pct = Math.min(Math.round(qty / ro * 100), 100);
+            document.getElementById('previewBar').style.width = pct + '%';
+            document.getElementById('stockPct').textContent = pct + '%';
+            const bar = document.getElementById('previewBar');
+            let txt, col;
+            if (qty <= ro / 2) { bar.className = 'progress-fill fill-red'; txt = '⚠ CRITICAL — Stock critically low'; col = 'var(--red)'; }
+            else if (qty <= ro) { bar.className = 'progress-fill fill-amber'; txt = '⚠ LOW — Below reorder level'; col = '#fbbf24'; }
+            else { bar.className = 'progress-fill fill-green'; txt = '✓ NORMAL — Stock level healthy'; col = 'var(--green)'; }
+            const el = document.getElementById('stockStatusTxt');
+            el.textContent = txt;
+            el.style.color = col;
+        }
+        updatePreview();
 
-                if (quantity <= reorder / 2) {
-                    statusText = '<i class="fas fa-exclamation-circle"></i> CRITICAL - Stock is critically low';
-                    statusColor = 'color: var(--danger);';
-                } else if (quantity <= reorder) {
-                    statusText = '<i class="fas fa-exclamation-triangle"></i> LOW - Stock is below reorder level';
-                    statusColor = 'color: var(--warning);';
-                } else {
-                    statusText = '<i class="fas fa-check-circle"></i> NORMAL - Stock level is healthy';
-                    statusColor = 'color: var(--success);';
-                }
-
-                document.getElementById('stockStatus').innerHTML = statusText;
-                document.getElementById('stockStatus').setAttribute('style', statusColor + 'font-size: 12px;');
-            }
-
-            // Initialize preview
-            updatePreview();
-        </script>
-
-    </main>
+        function validateAddForm() {
+            const name = document.getElementById('skuName').value.trim();
+            const cat = document.getElementById('category').value;
+            const qty = parseInt(document.getElementById('quantity').value);
+            const ro = parseInt(document.getElementById('reorder').value);
+            const cost = parseFloat(document.getElementById('cost').value);
+            if (!name || !cat) { alert('SKU Name and Category are required!'); return false; }
+            if (isNaN(qty) || qty < 0) { alert('Enter a valid quantity (≥ 0)'); return false; }
+            if (isNaN(ro) || ro < 0) { alert('Enter a valid reorder level (≥ 0)'); return false; }
+            if (isNaN(cost) || cost < 0) { alert('Enter a valid cost (≥ 0)'); return false; }
+            return true;
+        }
+    </script>
+    <script src="/static/enhancements.js"></script>
 </body>
 
 </html>
