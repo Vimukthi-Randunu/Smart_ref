@@ -1,447 +1,309 @@
-# ✅ ENHANCEMENT COMPLETE - START HERE
+# 📦 SmartRefill — Warehouse Inventory Management System
 
-## 🎉 Your Project Has Been Enhanced!
-
-Hello! Your SMART_REFILL warehouse management project has been **completely enhanced** with professional styling, modern features, and comprehensive documentation. Here's what you need to know:
+A full-featured, multi-tenant warehouse management web application built with **Python Flask** and **SQLite**. SmartRefill helps teams track stock levels, manage inbound/outbound movements, monitor suppliers, generate reports, and receive low-stock email alerts — all through a clean, modern dark-themed UI.
 
 ---
 
-## 🚀 QUICK START
+## 🚀 Features
 
-### 1. Test Your Project
-```bash
-# Run your Flask app
-python app.py
+### 🔐 Authentication & User Management
 
-# Visit in browser
-http://localhost:5000
-```
+- Secure signup and login with **hashed passwords** (`werkzeug.security`)
+- Per-user data isolation (multi-tenant — each user sees only their own inventory)
+- Session-based authentication with `login_required` decorator
+- Password change from Profile Settings
 
-### 2. Try These Features Right Away
-- 🌙 **Dark Mode**: Click the moon icon (🌙) in top-right corner
-- 🔍 **Search**: Go to "Warehouse Stock" and search products
-- 📊 **Export**: Click "Export CSV" on Warehouse Stock page
-- ➕ **Add Product**: Use the improved "Add SKU" form
-- 📈 **Dashboard**: Check the enhanced dashboard with alerts
+### 📊 Dashboard
 
-### 3. Read Documentation
-- Start with: `PROJECT_SUMMARY.md`
-- Features explained: `ENHANCEMENTS.md`
-- Setup help: `SETUP_GUIDE.md`
-- Next steps: `RECOMMENDATIONS.md`
-- Quick ref: `QUICK_REFERENCE.md`
+- At-a-glance KPIs: Total SKUs, Inventory Value, Critical & Low stock counts
+- Today's inbound and outbound units
+- Direct navigation to all major sections
 
----
+### 📦 Warehouse Stock (Products)
 
-## 📊 What Changed
+- Add, edit, and delete SKUs (Stock Keeping Units)
+- Fields: Name, Category, Quantity, Reorder Level, Cost per Unit, Supplier
+- Real-time stock status badges: `NORMAL` / `LOW` / `CRITICAL`
+- Search and filter products by name or category
+- Export stock movement history to **CSV**
 
-### Files Modified (4 total)
-✅ `static/style.css` - Added 300+ lines of styling
-✅ `templates/dashboard.html` - Complete redesign
-✅ `templates/add_product.html` - Better form & validation
-✅ `templates/view_products.html` - Search, filters, export
+### 🟢 Inbound / 🔴 Outbound Movements
 
-### Files Created (5 total)
-✅ `static/enhancements.js` - 400+ lines of JavaScript utilities
-✅ `ENHANCEMENTS.md` - Complete feature guide
-✅ `RECOMMENDATIONS.md` - Enhancement suggestions
-✅ `SETUP_GUIDE.md` - Implementation guide
-✅ `PROJECT_SUMMARY.md` - Full overview
+- Record incoming stock (Inbound)
+- Record outgoing/sold stock (Outbound) with stock-level validation
+- Automatic **email alert** triggered when outbound causes stock to drop below reorder level
 
-### Files Created (THIS FILE + OTHERS)
-✅ `QUICK_REFERENCE.md` - Quick feature reference
-✅ `README.md` (This file)
+### 🔔 Refill Dashboard
 
----
+- Lists all products currently at or below reorder level
+- Smart urgency sorting (most critical items first)
+- Shows: Current Qty, Reorder Level, Average Daily Usage, Estimated Days Remaining, Suggested Order Qty
+- **Manual "Send Alert Email"** button to trigger an immediate low-stock report
 
-## ✨ Key Features Added
+### 📧 Email Alerts
 
-### 10 Major Features
-```
-1. 🌙 Dark Mode            - Professional night theme
-2. 🔍 Real-time Search     - Filter products instantly
-3. 🏷️  Category Filter      - Filter by type
-4. 📊 Status Filter        - Normal/Low/Critical
-5. 📥 CSV Export           - Download inventory data
-6. 📈 Stock Preview        - Visual feedback while adding
-7. ✅ Better Validation    - Inline error messages
-8. 📋 Statistics Cards     - Quick inventory overview
-9. 🎨 Professional Design  - Modern, responsive UI
-10. 🔔 Alert System        - Color-coded notifications
-```
+- Rich HTML email with product-level details (status, stock %, days remaining, suggested order)
+- Auto-triggered on outbound when stock becomes CRITICAL or LOW
+- Manually triggered from the Refill page
+- Configurable via environment variables (Gmail/SMTP)
+- Toggle alerts on/off from Profile Settings
 
----
+### 🏢 Suppliers
 
-## 📱 Device Support
+- Add, edit, and delete supplier records (Name, Contact, Phone, Email, Address)
+- Link suppliers to products
+- Safe-delete: prevents deletion if supplier is linked to active products
 
-✅ Works on Desktop (Windows/Mac/Linux)
-✅ Works on Tablets (iPad, Android)
-✅ Works on Mobile (iPhone, Android phones)
-✅ Responsive design automatically adjusts
+### 📈 Reports
 
----
+- **Top Movers**: Top 10 most-sold products
+- **ABC Analysis**: Classifies products into A (top 70%), B (next 20%), C (bottom 10%) by sales volume
+- **Dead Stock Detection**: Products with stock > 0 but no outbound movement in the last 30 days
+- Summary stats: Total SKUs, Total Items in Stock, Total Inventory Value
 
-## 🎯 For College Submission
+### 📋 History & CSV Export
 
-### Your Project Now Shows
-- ✅ Full-stack development skills
-- ✅ Modern UI/UX design
-- ✅ Advanced JavaScript
-- ✅ Professional CSS
-- ✅ Responsive design
-- ✅ Database management
-- ✅ Form handling
-- ✅ Error management
+- Full stock movement log (Inbound/Outbound) with timestamps in **IST**
+- Filter by time period (last 7 / 30 / 90 days)
+- One-click **Export CSV** download
 
-### Highlights for Professors
-1. **Dark Mode** - Shows modern features
-2. **Search & Filters** - Shows JavaScript skills
-3. **Export CSV** - Shows practical thinking
-4. **Responsive Design** - Shows mobile-first approach
-5. **Professional Styling** - Shows design sense
-6. **Documentation** - Shows professionalism
-7. **Code Quality** - Shows best practices
+### 👤 Profile Settings
+
+- Update email address for alert notifications
+- Toggle email alerts on/off
+- Change password securely
+
+### 🎨 UI & Design
+
+- Dark-themed, responsive interface
+- Light/Dark theme toggle (`dark-theme.css`)
+- Smooth animations via `enhancements.js`
+- Mobile-friendly layout
 
 ---
 
-## 📚 Documentation Files
-
-### Read in This Order
-1. **This File** (README.md) - Overview & quick start
-2. **QUICK_REFERENCE.md** - Feature quick reference
-3. **PROJECT_SUMMARY.md** - Complete project overview
-4. **ENHANCEMENTS.md** - Detailed feature guide
-5. **SETUP_GUIDE.md** - Technical setup & deployment
-6. **RECOMMENDATIONS.md** - Suggestions for further improvements
-
-### Each File Explains
-```
-README.md              → Start here, quick overview
-QUICK_REFERENCE.md    → Visual feature reference
-PROJECT_SUMMARY.md    → Complete feature list
-ENHANCEMENTS.md       → Detailed feature descriptions
-SETUP_GUIDE.md        → Technical implementation
-RECOMMENDATIONS.md    → What to add next
-```
-
----
-
-## 🔧 How Features Work
-
-### Dark Mode (🌙)
-- Click button in top-right corner
-- Entire interface turns dark
-- Your choice is remembered
-- Works on all pages
-
-### Search 🔍
-- Go to "Warehouse Stock"
-- Type in the search box
-- Results filter instantly
-- Works with name and category
-
-### Filters
-- Go to "Warehouse Stock"
-- Use Category dropdown
-- Use Status dropdown
-- Combine for precise results
-
-### Export CSV 📊
-- Go to "Warehouse Stock"
-- Apply filters if needed
-- Click "Export CSV"
-- File downloads automatically
-- Open in Excel/Sheets
-
-### Stock Preview
-- Go to "Add SKU"
-- Enter quantity and reorder level
-- See visual preview update
-- Shows if status is Normal/Low/Critical
-
----
-
-## 🎓 What Makes This Project Strong
-
-### Design
-✅ Modern color scheme
-✅ Smooth animations
-✅ Professional typography
-✅ Consistent spacing
-✅ Intuitive layout
-
-### Code
-✅ Well-organized
-✅ Properly commented
-✅ Best practices
-✅ No unnecessary complexity
-✅ Scalable architecture
-
-### Features
-✅ Advanced filtering
-✅ Real-time search
-✅ Data export
-✅ Form validation
-✅ Stock indicators
-
-### Documentation
-✅ Comprehensive guides
-✅ Clear explanations
-✅ Usage examples
-✅ Helpful tips
-✅ Troubleshooting
-
----
-
-## ⚡ Next Steps
-
-### Immediately (Do This First)
-1. Run the Flask app
-2. Test all pages
-3. Try dark mode toggle
-4. Test search and filters
-5. Test export function
-
-### Before Submission
-1. Review all documentation
-2. Test on mobile device
-3. Check all features work
-4. Verify no errors in console
-5. Take screenshots for presentation
-
-### Optional Enhancements (Recommended)
-1. Add Edit button for products
-2. Add Delete with confirmation
-3. Add simple pagination
-4. See RECOMMENDATIONS.md for more
-
-### For Extra Credit
-1. Implement user login
-2. Add email notifications
-3. Create analytics page
-4. Add batch operations
-5. See RECOMMENDATIONS.md for detailed guides
-
----
-
-## 🐛 Troubleshooting
-
-### Dark mode not working?
-- Clear browser cache (Ctrl+Shift+Delete)
-- Refresh page (Ctrl+R)
-- Try different browser
-
-### Search not filtering?
-- Make sure you have products added
-- Refresh the page
-- Check browser console (F12) for errors
-
-### Export not downloading?
-- Ensure table has data
-- Check browser download settings
-- Try different browser
-
-### Features missing?
-- Verify enhancements.js is loaded
-- Check Network tab in DevTools
-- Verify file paths are correct
-
----
-
-## 📊 File Structure
+## 🗂️ Project Structure
 
 ```
-smart_refill/
-├── app.py                    (Flask backend - unchanged)
-├── database.py               (Database - unchanged)
-├── create_db.py              (Setup - unchanged)
-├── models/
-│   └── product.py            (Data model - unchanged)
+SMART_REFILL/
+├── app.py                    # Main Flask application (all routes & logic)
+├── database.py               # DB connection & schema initialization
+├── inventory.db              # SQLite database (auto-created)
+├── requirements.txt          # Python dependencies
+├── .gitignore
+│
+├── templates/                # Jinja2 HTML templates
+│   ├── index.html            # Public landing page
+│   ├── login.html            # Login page
+│   ├── signup.html           # Signup page
+│   ├── dashboard.html        # Main dashboard
+│   ├── view_products.html    # Warehouse stock list
+│   ├── add_product.html      # Add new SKU
+│   ├── edit_product.html     # Edit existing SKU
+│   ├── inbound.html          # Record inbound stock
+│   ├── outbound.html         # Record outbound stock
+│   ├── refill.html           # Refill / low-stock dashboard
+│   ├── reports.html          # Analytics & reports
+│   ├── suppliers.html        # Supplier management
+│   ├── history.html          # Movement history
+│   └── profile.html          # User profile & settings
+│
 ├── static/
-│   ├── style.css             (ENHANCED - 900+ lines)
-│   ├── enhancements.js       (NEW - 400+ lines)
-│   └── dashboard.js          (Unchanged)
-├── templates/
-│   ├── dashboard.html        (ENHANCED)
-│   ├── add_product.html      (ENHANCED)
-│   ├── view_products.html    (ENHANCED)
-│   ├── inbound.html          (Unchanged)
-│   ├── outbound.html         (Unchanged)
-│   ├── history.html          (Unchanged)
-│   ├── refill.html           (Unchanged)
-│   └── index.html            (Unchanged)
-├── README.md                 (THIS FILE)
-├── PROJECT_SUMMARY.md        (NEW - Complete overview)
-├── QUICK_REFERENCE.md        (NEW - Feature reference)
-├── ENHANCEMENTS.md           (NEW - Feature details)
-├── SETUP_GUIDE.md            (NEW - Setup guide)
-└── RECOMMENDATIONS.md        (NEW - Next steps)
+│   ├── style.css             # Main stylesheet
+│   ├── dark-theme.css        # Dark theme overrides
+│   ├── enhancements.js       # UI animations & interactivity
+│   └── dashboard.js          # Dashboard chart logic
+│
+└── scripts/                  # One-time DB migration scripts
+    ├── upgrade_db.py         # General DB upgrade script
+    ├── add_cost_column.py    # Adds cost_per_unit column
+    ├── add_suppliers_table.py# Creates suppliers table
+    └── README.md             # Scripts usage guide
 ```
 
 ---
 
-## 💻 Technical Details
+## 🗄️ Database Schema
 
-### No New Dependencies Added
-- ✅ Still uses Flask
-- ✅ Still uses SQLite
-- ✅ Still uses Bootstrap (CDN)
-- ✅ Still uses Font Awesome (CDN)
-- ✅ Vanilla JavaScript only
+**`users`**
+| Column | Type | Description |
+|---|---|---|
+| id | INTEGER PK | Auto-increment |
+| username | TEXT UNIQUE | Login username |
+| password | TEXT | Hashed password |
+| email | TEXT | Email for alerts |
+| email_alerts | INTEGER | 1 = enabled, 0 = disabled |
+| created_at | TIMESTAMP | Account creation time |
 
-### Performance
-- ✅ Fast page loads
-- ✅ Smooth animations
-- ✅ Responsive filtering
-- ✅ Optimized assets
+**`products`**
+| Column | Type | Description |
+|---|---|---|
+| id | INTEGER PK | Auto-increment |
+| user_id | INTEGER FK | Owner user |
+| name | TEXT | SKU name (unique per user) |
+| category | TEXT | Product category |
+| quantity | INTEGER | Current stock |
+| reorder_level | INTEGER | Alert threshold |
+| cost_per_unit | REAL | Unit cost |
+| sales_count | INTEGER | Total units sold |
+| supplier_id | INTEGER FK | Linked supplier |
+| created_at | TIMESTAMP | Creation time |
 
-### Browser Support
-- ✅ Chrome (Latest)
-- ✅ Firefox (Latest)
-- ✅ Safari (Latest)
-- ✅ Edge (Latest)
-- ✅ Mobile Browsers
+**`stock_movements`**
+| Column | Type | Description |
+|---|---|---|
+| id | INTEGER PK | Auto-increment |
+| user_id | INTEGER FK | Owner user |
+| product_name | TEXT | SKU name |
+| movement_type | TEXT | `IN` or `OUT` |
+| quantity | INTEGER | Units moved |
+| timestamp | TIMESTAMP | Movement time |
+
+**`suppliers`**
+| Column | Type | Description |
+|---|---|---|
+| id | INTEGER PK | Auto-increment |
+| user_id | INTEGER FK | Owner user |
+| name | TEXT | Supplier name |
+| contact_name | TEXT | Contact person |
+| phone | TEXT | Phone number |
+| email | TEXT | Email address |
+| address | TEXT | Physical address |
 
 ---
 
-## 🎁 What You Get
+## ⚙️ Setup & Installation
 
-### Right Now
-✅ Professional-looking warehouse app
-✅ Modern dark mode theme
-✅ Advanced search & filtering
-✅ CSV export capability
-✅ Better forms & validation
-✅ Professional documentation
+### 1. Clone the Repository
 
-### Ready to Deploy
-✅ Production-ready code
-✅ Responsive design
-✅ Error handling
-✅ Performance optimized
-✅ Well documented
+```bash
+git clone https://github.com/Kan-06/Smart_ref.git
+cd Smart_ref
+```
 
-### For College
-✅ Impressive features to show
-✅ Professional code quality
-✅ Complete documentation
-✅ Portfolio-worthy project
-✅ Excellent demonstration of skills
+### 2. Create a Virtual Environment
 
----
+```bash
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
+```
 
-## 📝 Quick Commands
+### 3. Install Dependencies
 
-### Run the app
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Initialize the Database
+
+```bash
+python database.py
+```
+
+### 5. (Optional) Configure Email Alerts
+
+Set the following environment variables to enable email alerts:
+
+```bash
+# Windows (PowerShell)
+$env:MAIL_USERNAME = "your_gmail@gmail.com"
+$env:MAIL_PASSWORD = "your_gmail_app_password"
+$env:MAIL_FROM     = "your_gmail@gmail.com"
+
+# macOS/Linux
+export MAIL_USERNAME="your_gmail@gmail.com"
+export MAIL_PASSWORD="your_gmail_app_password"
+export MAIL_FROM="your_gmail@gmail.com"
+```
+
+> **Note:** For Gmail, use an [App Password](https://myaccount.google.com/apppasswords), not your account password. 2-Step Verification must be enabled.
+
+### 6. Run the Application
+
 ```bash
 python app.py
 ```
 
-### Access the app
-```
-http://localhost:5000
-```
-
-### Test dark mode
-```
-Click 🌙 in top-right corner
-```
-
-### Test search
-```
-Go to Warehouse Stock → Type in search box
-```
-
-### Test export
-```
-Go to Warehouse Stock → Click "Export CSV"
-```
+Open your browser at: **http://localhost:5000**
 
 ---
 
-## 🎯 Success Checklist
+## 🌐 Application Routes
 
-Before submitting your project, verify:
-
-- [ ] App runs without errors
-- [ ] Dashboard displays correctly
-- [ ] Dark mode toggle works
-- [ ] Search filters in real-time
-- [ ] Category filter works
-- [ ] Status filter works
-- [ ] Export downloads CSV
-- [ ] Stock preview updates
-- [ ] Form validation shows errors
-- [ ] All pages look professional
-- [ ] Mobile layout works
-- [ ] No console errors (F12)
-- [ ] All buttons clickable
-- [ ] All links work
-- [ ] Data persists correctly
-
----
-
-## 📞 Need Help?
-
-### Check the Documentation
-1. **Overview** → PROJECT_SUMMARY.md
-2. **Features** → ENHANCEMENTS.md or QUICK_REFERENCE.md
-3. **Setup** → SETUP_GUIDE.md
-4. **Next Steps** → RECOMMENDATIONS.md
-
-### Browser Console
-- Press F12
-- Check Console tab
-- Look for errors
-- Report any issues
-
-### Common Issues
-- See SETUP_GUIDE.md "Troubleshooting" section
-- Clear cache and refresh
-- Try different browser
+| Method   | Route                    | Description                  |
+| -------- | ------------------------ | ---------------------------- |
+| GET      | `/`                      | Public landing page          |
+| GET/POST | `/login`                 | User login                   |
+| GET/POST | `/signup`                | New user registration        |
+| GET      | `/logout`                | Logout & clear session       |
+| GET      | `/dashboard`             | Main dashboard               |
+| GET      | `/products`              | View all stock / SKUs        |
+| GET/POST | `/add`                   | Add new SKU                  |
+| GET/POST | `/edit/<name>`           | Edit existing SKU            |
+| POST     | `/delete/<name>`         | Delete SKU                   |
+| GET/POST | `/inbound`               | Record inbound stock         |
+| GET/POST | `/outbound`              | Record outbound stock        |
+| GET      | `/refill`                | Refill / low-stock dashboard |
+| POST     | `/send-alert`            | Send low-stock email alert   |
+| GET      | `/reports`               | Analytics reports            |
+| GET/POST | `/suppliers`             | Supplier list & add          |
+| GET/POST | `/suppliers/edit/<id>`   | Edit supplier                |
+| POST     | `/suppliers/delete/<id>` | Delete supplier              |
+| GET      | `/history`               | Stock movement history       |
+| GET      | `/export`                | Download CSV export          |
+| GET/POST | `/profile`               | User profile & settings      |
 
 ---
 
-## 🌟 You're All Set!
+## 🔧 Tech Stack
 
-Your Smart Refill project is now:
-
-✅ **Visually Impressive** - Modern, professional design
-✅ **Feature-Rich** - Multiple advanced features
-✅ **Well-Documented** - Comprehensive guides
-✅ **Production-Ready** - High-quality code
-✅ **College-Ready** - Perfect for submission
-✅ **Portfolio-Ready** - Show to employers
-
----
-
-## 🎉 Next: Start Testing!
-
-1. **Run**: `python app.py`
-2. **Visit**: `http://localhost:5000`
-3. **Explore**: Try all the features
-4. **Read**: Check QUICK_REFERENCE.md
-5. **Enjoy**: You've got a professional app!
+| Layer      | Technology                    |
+| ---------- | ----------------------------- |
+| Backend    | Python 3, Flask 3.0           |
+| Database   | SQLite (via `sqlite3`)        |
+| Auth       | Werkzeug password hashing     |
+| Email      | Python `smtplib` + Gmail SMTP |
+| Frontend   | HTML5, CSS3, Vanilla JS       |
+| Deployment | Gunicorn (Render / Linux)     |
 
 ---
 
-## 📧 Summary
+## 🚢 Deployment (Render)
 
-Your Smart Refill warehouse management system has been **significantly enhanced** with professional styling, advanced features, and comprehensive documentation. The project is now ready for college submission with features that will impress your evaluators.
-
-**All enhancements are:**
-- ✅ Production-ready
-- ✅ Well-documented
-- ✅ Fully responsive
-- ✅ Professionally designed
-- ✅ Easy to maintain
-- ✅ Ready to extend
-
-**Good luck with your project! 🚀**
+1. Push your code to GitHub
+2. Create a new **Web Service** on [Render](https://render.com)
+3. Set **Build Command**: `pip install -r requirements.txt`
+4. Set **Start Command**: `gunicorn app:app`
+5. Add environment variables: `SECRET_KEY`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM`
 
 ---
 
-**Enhancement Date**: January 2026
-**Status**: ✅ COMPLETE & TESTED
-**Ready For**: College Submission + Production Use
+## 📌 Stock Status Logic
 
+| Status      | Condition                       |
+| ----------- | ------------------------------- |
+| 🟢 NORMAL   | `quantity > reorder_level`      |
+| 🟡 LOW      | `quantity <= reorder_level`     |
+| 🔴 CRITICAL | `quantity <= reorder_level / 2` |
+
+---
+
+## 🛡️ Security Notes
+
+- All passwords are stored as **bcrypt hashes** (via Werkzeug)
+- Session secrets are set via environment variables in production
+- User data is fully isolated — no cross-user data leakage
+- Only internal redirect paths are allowed after login (open-redirect prevention)
+
+---
+
+## 📄 License
+
+This project is developed for academic and educational purposes.
+
+---
+
+_SmartRefill — Built with Flask & SQLite | February 2026_
