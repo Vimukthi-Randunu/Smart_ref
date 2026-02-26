@@ -20,13 +20,6 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-
-    # Safe migration: add email columns if not already present (handles existing DBs)
-    existing_cols = [row[1] for row in cur.execute("PRAGMA table_info(users)").fetchall()]
-    if "email" not in existing_cols:
-        cur.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT NULL")
-    if "email_alerts" not in existing_cols:
-        cur.execute("ALTER TABLE users ADD COLUMN email_alerts INTEGER DEFAULT 1")
     
     # Products table with user_id for multi-tenant support
     cur.execute("""
@@ -40,6 +33,7 @@ def init_db():
             cost_per_unit REAL DEFAULT 0.0,
             sales_count INTEGER DEFAULT 0,
             supplier_id INTEGER,
+            expiry_date DATE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL,

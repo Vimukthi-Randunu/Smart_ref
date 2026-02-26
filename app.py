@@ -1,8 +1,8 @@
 import os
-import smtplib
+import csv
+import io
 import threading
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import requests
 from flask import Flask, render_template, request, redirect, Response, flash, session, jsonify
 from database import get_connection
 from datetime import datetime, timedelta
@@ -11,6 +11,41 @@ from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "smart_refill_dev_key_change_in_production")
+
+# ─── Indian Number formatting filter (1,00,000 format) ───
+def indian_format(value, decimals=0):
+    """Format a number in Indian numbering system (e.g. 1,00,000)"""
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    
+    is_negative = value < 0
+    value = abs(value)
+    
+    if decimals > 0:
+        int_part = int(value)
+        dec_part = f"{value - int_part:.{decimals}f}"[1:]  # ".XX"
+    else:
+        int_part = round(value)
+        dec_part = ""
+    
+    s = str(int_part)
+    if len(s) <= 3:
+        result = s
+    else:
+        last3 = s[-3:]
+        remaining = s[:-3]
+        # Group remaining digits in pairs from right
+        groups = []
+        while remaining:
+            groups.insert(0, remaining[-2:])
+            remaining = remaining[:-2]
+        result = ",".join(groups) + "," + last3
+    
+    return ("-" if is_negative else "") + result + dec_part
+
+app.jinja_env.filters['indian'] = indian_format
 
 # ─── AUTO MIGRATE: ensure new columns exist in any pre-existing DB ───
 def _migrate_db():
@@ -22,12 +57,27 @@ def _migrate_db():
             cur.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT NULL")
         if "email_alerts" not in existing:
             cur.execute("ALTER TABLE users ADD COLUMN email_alerts INTEGER DEFAULT 1")
+            
+        existing_products = [r[1] for r in cur.execute("PRAGMA table_info(products)").fetchall()]
+        if "expiry_date" not in existing_products:
+            cur.execute("ALTER TABLE products ADD COLUMN expiry_date DATE DEFAULT NULL")
+            
+        # Legacy SMTP columns (kept for safe migration of existing DBs)
         if "smtp_email" not in existing:
             cur.execute("ALTER TABLE users ADD COLUMN smtp_email TEXT DEFAULT NULL")
         if "smtp_pass" not in existing:
             cur.execute("ALTER TABLE users ADD COLUMN smtp_pass TEXT DEFAULT NULL")
         if "last_alert_sent" not in existing:
             cur.execute("ALTER TABLE users ADD COLUMN last_alert_sent TIMESTAMP DEFAULT NULL")
+        # EmailJS columns
+        if "emailjs_service_id" not in existing:
+            cur.execute("ALTER TABLE users ADD COLUMN emailjs_service_id TEXT DEFAULT NULL")
+        if "emailjs_template_id" not in existing:
+            cur.execute("ALTER TABLE users ADD COLUMN emailjs_template_id TEXT DEFAULT NULL")
+        if "emailjs_public_key" not in existing:
+            cur.execute("ALTER TABLE users ADD COLUMN emailjs_public_key TEXT DEFAULT NULL")
+        if "emailjs_private_key" not in existing:
+            cur.execute("ALTER TABLE users ADD COLUMN emailjs_private_key TEXT DEFAULT NULL")
         conn.commit()
         conn.close()
     except Exception as _e:
@@ -35,162 +85,13 @@ def _migrate_db():
 
 _migrate_db()   # runs once at import / startup
 
-# ─── EMAIL CONFIG (set these as environment variables or fill in directly for testing) ───
-MAIL_SERVER   = os.environ.get("MAIL_SERVER",   "smtp.gmail.com")
-MAIL_PORT     = int(os.environ.get("MAIL_PORT",   "587"))
-MAIL_USERNAME = os.environ.get("MAIL_USERNAME",  "")   # your Gmail address
-MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD",  "")   # Gmail App Password
-MAIL_FROM     = os.environ.get("MAIL_FROM",      MAIL_USERNAME)
-
-# ─── EMAIL HELPER ───
-def send_stock_alert_email(to_email: str, username: str, alert_products: list,
-                           smtp_user: str = None, smtp_pass: str = None):
-    """Send a rich HTML low-stock alert email. Runs in a background thread so it
-    does not block the HTTP response.
-    Uses per-user smtp_user/smtp_pass if provided, else falls back to env vars."""
-    _smtp_user = smtp_user or MAIL_USERNAME
-    _smtp_pass = smtp_pass or MAIL_PASSWORD
-    if not _smtp_user or not _smtp_pass:
-        print("[Email] SMTP credentials not configured — skipping alert.")
-        return
-    if not to_email:
-        return
-
-    now_str = datetime.now().strftime("%d %b %Y, %I:%M %p")
-    critical = [p for p in alert_products if p['status'] == 'CRITICAL']
-    low      = [p for p in alert_products if p['status'] == 'LOW']
-
-    # ── Build HTML rows ──
-    def row(p):
-        badge_color = '#ef4444' if p['status'] == 'CRITICAL' else '#f59e0b'
-        pct = round((p['quantity'] / max(p['reorder'], 1)) * 100)
-        pct_bar_color = '#ef4444' if p['status'] == 'CRITICAL' else '#f59e0b'
-        days = f"{p.get('days_remaining', '—')} days" if p.get('days_remaining') else 'N/A'
-        return f"""
-        <tr style="border-bottom:1px solid #2a2945">
-          <td style="padding:12px 16px;font-weight:600;color:#f1f0ff">{p['name']}</td>
-          <td style="padding:12px 16px;color:#a78bfa">{p.get('category','—')}</td>
-          <td style="padding:12px 16px">
-            <span style="background:rgba(255,255,255,.06);color:#f1f0ff;padding:3px 10px;border-radius:20px;font-weight:700">{p['quantity']}</span>
-          </td>
-          <td style="padding:12px 16px;color:#94a3b8">{p['reorder']}</td>
-          <td style="padding:12px 16px">
-            <span style="background:{badge_color}22;color:{badge_color};padding:3px 12px;border-radius:20px;font-size:11px;font-weight:800;border:1px solid {badge_color}44">{p['status']}</span>
-          </td>
-          <td style="padding:12px 16px">
-            <div style="width:80px;height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">
-              <div style="width:{min(pct,100)}%;height:100%;background:{pct_bar_color};border-radius:3px"></div>
-            </div>
-            <span style="color:#94a3b8;font-size:11px">{pct}%</span>
-          </td>
-          <td style="padding:12px 16px;color:#94a3b8">{days}</td>
-          <td style="padding:12px 16px;color:#34d399;font-weight:700">{p.get('suggested_qty','—')}</td>
-        </tr>"""
-
-    rows_html = "".join(row(p) for p in alert_products)
-    n_critical = len(critical)
-    n_low      = len(low)
-    subject    = f"🚨 SmartRefill: {len(alert_products)} Stock Alert{'s' if len(alert_products)!=1 else ''} — Action Required"
-
-    html = f"""
-    <!DOCTYPE html><html><head><meta charset="UTF-8"></head>
-    <body style="margin:0;padding:0;background:#0f0e17;font-family:'Segoe UI',Arial,sans-serif">
-      <div style="max-width:700px;margin:30px auto;background:#16152a;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.1)">
-
-        <!-- Header -->
-        <div style="background:linear-gradient(135deg,#6c63ff,#a78bfa);padding:32px 36px">
-          <div style="display:flex;align-items:center;gap:14px">
-            <div style="width:48px;height:48px;background:rgba(255,255,255,.2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px">📦</div>
-            <div>
-              <div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.5px">SmartRefill Alert</div>
-              <div style="color:rgba(255,255,255,.75);font-size:13px">Low Stock Notification — {now_str}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Summary badges -->
-        <div style="padding:24px 36px 0;display:flex;gap:16px;flex-wrap:wrap">
-          <div style="background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.25);border-radius:10px;padding:14px 22px;flex:1;min-width:140px">
-            <div style="color:#f87171;font-size:28px;font-weight:900">{n_critical}</div>
-            <div style="color:#fca5a5;font-size:12px;font-weight:700;margin-top:2px">CRITICAL Items</div>
-          </div>
-          <div style="background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.25);border-radius:10px;padding:14px 22px;flex:1;min-width:140px">
-            <div style="color:#fbbf24;font-size:28px;font-weight:900">{n_low}</div>
-            <div style="color:#fcd34d;font-size:12px;font-weight:700;margin-top:2px">LOW Stock Items</div>
-          </div>
-          <div style="background:rgba(108,99,255,.12);border:1px solid rgba(108,99,255,.25);border-radius:10px;padding:14px 22px;flex:1;min-width:140px">
-            <div style="color:#a78bfa;font-size:28px;font-weight:900">{len(alert_products)}</div>
-            <div style="color:#c4b5fd;font-size:12px;font-weight:700;margin-top:2px">Total Alerts</div>
-          </div>
-        </div>
-
-        <!-- Greeting -->
-        <div style="padding:24px 36px">
-          <p style="color:#f1f0ff;font-size:15px;margin:0 0 6px">Hello, <strong>{username}</strong> 👋</p>
-          <p style="color:#94a3b8;font-size:13px;margin:0">The following products in your SmartRefill warehouse have dropped to or below their reorder levels and need your immediate attention.</p>
-        </div>
-
-        <!-- Table -->
-        <div style="padding:0 36px 28px">
-          <div style="border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.1)">
-            <table style="width:100%;border-collapse:collapse">
-              <thead>
-                <tr style="background:rgba(108,99,255,.15)">
-                  <th style="padding:11px 16px;text-align:left;color:#94a3b8;font-size:11px;letter-spacing:1px;text-transform:uppercase">Product</th>
-                  <th style="padding:11px 16px;text-align:left;color:#94a3b8;font-size:11px;letter-spacing:1px;text-transform:uppercase">Category</th>
-                  <th style="padding:11px 16px;text-align:left;color:#94a3b8;font-size:11px;letter-spacing:1px;text-transform:uppercase">In Stock</th>
-                  <th style="padding:11px 16px;text-align:left;color:#94a3b8;font-size:11px;letter-spacing:1px;text-transform:uppercase">Reorder At</th>
-                  <th style="padding:11px 16px;text-align:left;color:#94a3b8;font-size:11px;letter-spacing:1px;text-transform:uppercase">Status</th>
-                  <th style="padding:11px 16px;text-align:left;color:#94a3b8;font-size:11px;letter-spacing:1px;text-transform:uppercase">Level</th>
-                  <th style="padding:11px 16px;text-align:left;color:#94a3b8;font-size:11px;letter-spacing:1px;text-transform:uppercase">Days Left</th>
-                  <th style="padding:11px 16px;text-align:left;color:#94a3b8;font-size:11px;letter-spacing:1px;text-transform:uppercase">Suggested Order</th>
-                </tr>
-              </thead>
-              <tbody>{rows_html}</tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- CTA -->
-        <div style="padding:0 36px 28px;text-align:center">
-          <a href="http://127.0.0.1:5000/refill" style="display:inline-block;padding:13px 32px;background:linear-gradient(135deg,#6c63ff,#5a52e0);color:#fff;font-size:14px;font-weight:700;border-radius:10px;text-decoration:none;box-shadow:0 6px 20px rgba(108,99,255,.4)">View Refill Dashboard →</a>
-        </div>
-
-        <!-- Footer -->
-        <div style="background:rgba(255,255,255,.04);border-top:1px solid rgba(255,255,255,.08);padding:18px 36px;text-align:center">
-          <p style="color:#64748b;font-size:12px;margin:0">SmartRefill Warehouse System &nbsp;·&nbsp; You are receiving this because email alerts are enabled for your account.</p>
-          <p style="color:#64748b;font-size:12px;margin:4px 0 0">To disable alerts, visit your <a href="http://127.0.0.1:5000/profile" style="color:#a78bfa">Profile Settings</a>.</p>
-        </div>
-      </div>
-    </body></html>
-    """
-
-    def _send():
-        try:
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = subject
-            msg['From']    = f"SmartRefill <{_smtp_user}>"
-            msg['To']      = to_email
-            msg.attach(MIMEText(html, 'html'))
-            with smtplib.SMTP(MAIL_SERVER, MAIL_PORT) as server:
-                server.ehlo()
-                server.starttls()
-                server.login(_smtp_user, _smtp_pass)
-                server.sendmail(_smtp_user, to_email, msg.as_string())
-            print(f"[Email] ✅ Alert sent to {to_email} for {len(alert_products)} item(s).")
-        except Exception as exc:
-            print(f"[Email] ❌ Failed to send alert: {exc}")
-
-    threading.Thread(target=_send, daemon=True).start()
-
-
 # ─── HELPER: get all low/critical stock products for a user ───
 def get_low_stock_products(user_id, conn):
     """Returns a list of dicts for all products at or below reorder level."""
     cur = conn.cursor()
     thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
     cur.execute("""
-        SELECT p.name, p.category, p.quantity, p.reorder_level, p.cost_per_unit,
+        SELECT p.name, p.category, p.quantity, p.reorder_level,
                COALESCE(SUM(CASE WHEN s.movement_type='OUT' AND s.timestamp > ? THEN s.quantity ELSE 0 END), 0) as out_30
         FROM products p
         LEFT JOIN stock_movements s ON p.name = s.product_name AND s.user_id = p.user_id
@@ -200,7 +101,7 @@ def get_low_stock_products(user_id, conn):
 
     products = []
     for row in cur.fetchall():
-        name, category, qty, reorder, cost, out_30 = row
+        name, category, qty, reorder, out_30 = row
         avg_daily  = round(out_30 / 30, 2) if out_30 > 0 else 0
         days_rem   = round(qty / avg_daily, 1) if avg_daily > 0 else None
         status     = get_stock_status(qty, reorder)
@@ -211,88 +112,8 @@ def get_low_stock_products(user_id, conn):
             'status': status, 'days_remaining': days_rem,
             'suggested_qty': suggested
         })
-    # CRITICAL first, then LOW
     products.sort(key=lambda x: 0 if x['status'] == 'CRITICAL' else 1)
     return products
-
-
-# ─── HELPER: auto-send alert for a user (with 2-hour cooldown) ───
-def try_send_auto_alert(user_id):
-    """Checks if the user has low/critical stock and sends a comprehensive
-    alert email. Respects a 2-hour cooldown to avoid spamming."""
-    try:
-        conn = get_connection()
-        cur  = conn.cursor()
-        cur.execute(
-            "SELECT email, email_alerts, username, smtp_email, smtp_pass, last_alert_sent FROM users WHERE id = ?",
-            (user_id,)
-        )
-        u = cur.fetchone()
-        if not u:
-            conn.close()
-            return
-
-        to_email, alerts_on, username, smtp_email, smtp_pass, last_sent = u
-
-        # Must have alerts enabled, a recipient email, and SMTP credentials
-        if not alerts_on or not to_email or not smtp_email or not smtp_pass:
-            conn.close()
-            return
-
-        # 2-hour cooldown: don't flood the inbox
-        if last_sent:
-            try:
-                last_dt = datetime.strptime(last_sent[:19], '%Y-%m-%d %H:%M:%S')
-                if (datetime.now() - last_dt).total_seconds() < 7200:
-                    conn.close()
-                    return
-            except Exception:
-                pass
-
-        alert_products = get_low_stock_products(user_id, conn)
-        if not alert_products:
-            conn.close()
-            return
-
-        # Record send time BEFORE dispatching so parallel triggers don't double-send
-        cur.execute(
-            "UPDATE users SET last_alert_sent = ? WHERE id = ?",
-            (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user_id)
-        )
-        conn.commit()
-        conn.close()
-
-        send_stock_alert_email(to_email, username, alert_products, smtp_email, smtp_pass)
-        print(f"[auto-alert] Sent to user {user_id} ({username}) — {len(alert_products)} item(s) low.")
-
-    except Exception as exc:
-        print(f"[auto-alert] Error for user {user_id}: {exc}")
-
-
-# ─── BACKGROUND PERIODIC ALERT CHECK (every 6 hours) ───
-def _background_alert_check():
-    """Runs every 6 hours. Sends auto-alerts to any user with unconfigured
-    low stock who has SMTP credentials set up."""
-    print("[bg-alert] Running periodic stock alert check...")
-    try:
-        conn = get_connection()
-        cur  = conn.cursor()
-        cur.execute(
-            "SELECT id FROM users WHERE email_alerts = 1 AND email IS NOT NULL "
-            "AND smtp_email IS NOT NULL AND smtp_pass IS NOT NULL"
-        )
-        user_ids = [row[0] for row in cur.fetchall()]
-        conn.close()
-        for uid in user_ids:
-            try_send_auto_alert(uid)
-    except Exception as exc:
-        print(f"[bg-alert] Error: {exc}")
-    finally:
-        # Schedule next run in 6 hours
-        threading.Timer(6 * 3600, _background_alert_check).start()
-
-# Kick off the first background check 60 seconds after startup
-threading.Timer(60, _background_alert_check).start()
 
 
 # -------- AUTHENTICATION DECORATOR --------
@@ -309,12 +130,19 @@ def login_required(f):
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
-        # Honour the hidden `next` field carried through the form
-        next_url  = request.form.get("next", "").strip()
+        if request.is_json:
+            data = request.get_json()
+            username = data.get("username", "").strip()
+            password = data.get("password", "").strip()
+            next_url = data.get("next", "").strip()
+        else:
+            username = request.form.get("username", "").strip()
+            password = request.form.get("password", "").strip()
+            next_url  = request.form.get("next", "").strip()
 
         if not username or not password:
+            if request.is_json:
+                return jsonify({"success": False, "error": "Username and password are required!"})
             flash("Username and password are required!", "error")
             return redirect("/login" + (f"?next={next_url}" if next_url else ""))
 
@@ -328,18 +156,30 @@ def login():
             if user and check_password_hash(user[1], password):
                 session['user_id'] = user[0]
                 session['username'] = username
-                flash(f"Welcome back, {username}!", "success")
-                # Safe redirect: only allow internal paths starting with /
+                
                 if next_url and next_url.startswith("/") and not next_url.startswith("//"):
-                    return redirect(next_url)
-                return redirect("/dashboard")
+                    redirect_url = next_url
+                else:
+                    redirect_url = "/dashboard"
+                    
+                if request.is_json:
+                    return jsonify({"success": True, "redirect": redirect_url})
+                    
+                flash(f"Welcome back, {username}!", "success")
+                return redirect(redirect_url)
             else:
+                if request.is_json:
+                    return jsonify({"success": False, "error": "Invalid username or password!"})
                 flash("Invalid username or password!", "error")
         except Exception as e:
+            if request.is_json:
+                return jsonify({"success": False, "error": f"Login error: {str(e)}"})
             flash(f"Login error: {str(e)}", "error")
         finally:
             conn.close()
 
+        if request.is_json:
+            return jsonify({"success": False, "error": "Login failed"})
         return redirect("/login" + (f"?next={next_url}" if next_url else ""))
 
     # GET — pass `next` so template can embed it in a hidden field
@@ -405,6 +245,79 @@ def logout():
     return redirect("/login")
 
 # -------- BUSINESS LOGIC --------
+def try_send_auto_alert(user_id):
+    import time
+    time.sleep(1)
+    
+    conn = get_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute(
+            "SELECT email, email_alerts, emailjs_service_id, emailjs_template_id, emailjs_public_key, emailjs_private_key, username "
+            "FROM users WHERE id = ?",
+            (user_id,)
+        )
+        user = cur.fetchone()
+        
+        if not user:
+            return
+            
+        recipient_email, alerts_enabled, ejs_svc, ejs_tpl, ejs_key, ejs_private, username = user
+        emailjs_ok = bool(ejs_svc and ejs_tpl and ejs_key and recipient_email)
+        
+        if not alerts_enabled or not emailjs_ok:
+            return
+            
+        cur.execute("""
+            SELECT name, quantity, reorder_level
+            FROM products
+            WHERE user_id = ? AND quantity <= reorder_level
+            ORDER BY (quantity * 1.0 / NULLIF(reorder_level, 0)) ASC
+        """, (user_id,))
+        
+        low_stock_items = cur.fetchall()
+        
+        if not low_stock_items:
+            return
+            
+        critical_count = sum(1 for item in low_stock_items if item[1] <= item[2] / 2)
+        
+        message_lines = []
+        for item in low_stock_items:
+            name, qty, reorder = item
+            status = get_stock_status(qty, reorder)
+            prefix = "RED" if status == "CRITICAL" else "YELLOW"
+            message_lines.append(f"[{prefix}] {name}: {qty} left (Reorder: {reorder})")
+            
+        message_text = "\n".join(message_lines)
+        
+        payload = {
+            "service_id": ejs_svc,
+            "template_id": ejs_tpl,
+            "user_id": ejs_key,
+            "template_params": {
+                "to_email": recipient_email,
+                "username": username,
+                "critical_count": str(critical_count),
+                "alert_count": str(len(low_stock_items)),
+                "message": message_text
+            }
+        }
+        
+        if ejs_private:
+            payload["accessToken"] = ejs_private
+        
+        resp = requests.post("https://api.emailjs.com/api/v1.0/email/send", json=payload, timeout=10)
+        
+        if resp.status_code != 200:
+            print(f"[EmailJS] Alert failed: {resp.status_code} - {resp.text}", flush=True)
+        
+    except Exception as e:
+        print(f"[EmailJS] Error: {e}", flush=True)
+    finally:
+        conn.close()
+
 def get_stock_status(quantity, reorder_level):
     if quantity <= reorder_level / 2:
         return "CRITICAL"
@@ -465,6 +378,83 @@ def dashboard():
     )
     outbound_today = cur.fetchone()[0] or 0
     
+    # 30-day trend data for line chart
+    thirty_days_ago = (today - timedelta(days=29)).strftime('%Y-%m-%d')
+    cur.execute("""
+        SELECT DATE(timestamp) as day, movement_type, SUM(quantity) as total
+        FROM stock_movements
+        WHERE user_id = ? AND DATE(timestamp) >= ?
+        GROUP BY DATE(timestamp), movement_type
+        ORDER BY day
+    """, (user_id, thirty_days_ago))
+    
+    trend_raw = cur.fetchall()
+    # Build daily arrays for last 30 days
+    trend_labels = []
+    trend_in = []
+    trend_out = []
+    for i in range(30):
+        d = today - timedelta(days=29 - i)
+        ds = d.strftime('%Y-%m-%d')
+        trend_labels.append(d.strftime('%d %b'))
+        trend_in.append(0)
+        trend_out.append(0)
+    
+    for day_str, mtype, total in trend_raw:
+        # Find index
+        try:
+            d = datetime.strptime(day_str, '%Y-%m-%d').date()
+            idx = (d - (today - timedelta(days=29))).days
+            if 0 <= idx < 30:
+                if mtype == 'IN':
+                    trend_in[idx] += total
+                elif mtype == 'OUT':
+                    trend_out[idx] += total
+        except (ValueError, IndexError):
+            pass
+            
+    # Category Distribution
+    cur.execute("""
+        SELECT category, SUM(quantity * cost_per_unit) as val
+        FROM products 
+        WHERE user_id = ? AND quantity > 0
+        GROUP BY category
+        ORDER BY val DESC
+        LIMIT 6
+    """, (user_id,))
+    
+    cat_data = cur.fetchall()
+    cat_labels = [row[0] for row in cat_data]
+    cat_values = [row[1] for row in cat_data]
+    
+    # Expiring Soon
+    cur.execute("""
+        SELECT name, quantity, expiry_date 
+        FROM products 
+        WHERE user_id = ? AND expiry_date IS NOT NULL 
+        ORDER BY expiry_date ASC
+    """, (user_id,))
+    exp_rows = cur.fetchall()
+    
+    expiring_soon = []
+    for r in exp_rows:
+        try:
+            exp_date = datetime.strptime(r[2], '%Y-%m-%d').date()
+            days = (exp_date - today).days
+            if days <= 30:
+                expiring_soon.append({
+                    "name": r[0],
+                    "quantity": r[1],
+                    "date": r[2],
+                    "days": days
+                })
+            elif days > 30:
+                # Since it's ordered by ASC date, we can break early if we exceed 30 days
+                # But we might have some invalid dates, so let's just continue
+                pass
+        except ValueError:
+            pass
+            
     conn.close()
     
     return render_template(
@@ -474,7 +464,13 @@ def dashboard():
         critical=critical,
         inbound=inbound_today,
         outbound=outbound_today,
-        total_value=total_value
+        total_value=total_value,
+        trend_labels=trend_labels,
+        trend_in=trend_in,
+        trend_out=trend_out,
+        cat_labels=cat_labels,
+        cat_values=cat_values,
+        expiring_soon=expiring_soon,
     )
 
 # ---------------- ADD SKU ----------------
@@ -490,8 +486,12 @@ def add_product():
         reorder_str = request.form.get("reorder", "0")
         cost = float(request.form.get("cost", "0"))
         supplier_id = request.form.get("supplier_id")
+        expiry_date = request.form.get("expiry_date")
+        
         if not supplier_id:
             supplier_id = None
+        if not expiry_date:
+            expiry_date = None
         
         # Validation
         if not name or not category:
@@ -520,8 +520,8 @@ def add_product():
                 return redirect("/add")
             
             cur.execute(
-                "INSERT INTO products (user_id, name, category, quantity, reorder_level, cost_per_unit, supplier_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (user_id, name, category, qty, reorder, cost, supplier_id)
+                "INSERT INTO products (user_id, name, category, quantity, reorder_level, cost_per_unit, supplier_id, expiry_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (user_id, name, category, qty, reorder, cost, supplier_id, expiry_date)
             )
             conn.commit()
             
@@ -543,6 +543,104 @@ def add_product():
     
     return render_template("add_product.html", suppliers=suppliers)
 
+# ---------------- IMPORT CSV ----------------
+@app.route("/import_csv", methods=["POST"])
+@login_required
+def import_csv():
+    user_id = session['user_id']
+    if 'file' not in request.files:
+        flash("No file uploaded!", "error")
+        return redirect("/products")
+    
+    file = request.files['file']
+    if file.filename == '':
+        flash("No file selected!", "error")
+        return redirect("/products")
+        
+    if not file.filename.endswith('.csv'):
+        flash("Only .csv files are supported!", "error")
+        return redirect("/products")
+        
+    try:
+        stream = io.StringIO(file.stream.read().decode("utf-8-sig"), newline=None)
+        reader = csv.DictReader(stream)
+        
+        headers = [h.strip().lower() for h in reader.fieldnames] if reader.fieldnames else []
+        reader.fieldnames = headers
+        
+        name_key = next((h for h in headers if h in ['name', 'item name', 'sku', 'product']), None)
+        if not name_key:
+            flash("CSV must contain a 'Name' column.", "error")
+            return redirect("/products")
+            
+        cat_key = next((h for h in headers if h in ['category', 'type', 'group']), 'category')
+        qty_key = next((h for h in headers if h in ['quantity', 'qty', 'stock']), 'quantity')
+        reorder_key = next((h for h in headers if h in ['reorder level', 'reorder', 'min stock']), 'reorder_level')
+        cost_key = next((h for h in headers if h in ['cost', 'price', 'cost per unit']), 'cost_per_unit')
+        
+        conn = get_connection()
+        cur = conn.cursor()
+        
+        success_count = 0
+        error_count = 0
+        
+        for row in reader:
+            name = row.get(name_key, "").strip()
+            if not name:
+                continue
+                
+            category = row.get(cat_key, "Uncategorized")
+            category = category.strip() if category else "Uncategorized"
+            
+            try:
+                qty = int(row.get(qty_key, 0) or 0)
+            except ValueError:
+                qty = 0
+                
+            try:
+                reorder = int(row.get(reorder_key, 10) or 10)
+            except ValueError:
+                reorder = 10
+                
+            try:
+                cost = float(row.get(cost_key, 0.0) or 0.0)
+            except ValueError:
+                cost = 0.0
+                
+            qty = max(0, qty)
+            reorder = max(0, reorder)
+            cost = max(0.0, cost)
+            
+            # Check if exists
+            cur.execute("SELECT id FROM products WHERE user_id = ? AND name = ?", (user_id, name))
+            if cur.fetchone():
+                error_count += 1
+                continue
+                
+            cur.execute(
+                "INSERT INTO products (user_id, name, category, quantity, reorder_level, cost_per_unit) VALUES (?, ?, ?, ?, ?, ?)",
+                (user_id, name, category, qty, reorder, cost)
+            )
+            success_count += 1
+            
+        conn.commit()
+        conn.close()
+        
+        if success_count > 0:
+            msg = f"Successfully imported {success_count} products!"
+            if error_count > 0:
+                msg += f" ({error_count} skipped due to duplicate names)"
+            flash(msg, "success")
+        elif error_count > 0:
+            flash(f"Failed to import: all {error_count} products already exist in your inventory.", "error")
+        else:
+            flash("No valid rows found in the CSV.", "error")
+            
+    except Exception as e:
+        flash(f"Error processing CSV: {str(e)}", "error")
+        
+    return redirect("/products")
+
 # ---------------- EDIT SKU ----------------
 @app.route("/edit/<product_name>", methods=["GET", "POST"])
 @login_required
@@ -557,8 +655,12 @@ def edit_product(product_name):
         reorder_str = request.form.get("reorder", "0")
         cost = float(request.form.get("cost", "0"))
         supplier_id = request.form.get("supplier_id")
+        expiry_date = request.form.get("expiry_date")
+        
         if not supplier_id:
             supplier_id = None
+        if not expiry_date:
+            expiry_date = None
         
         if not new_name or not category:
             flash("SKU Name and Category are required!", "error")
@@ -583,8 +685,8 @@ def edit_product(product_name):
         try:
             # Update product
             cur.execute(
-                "UPDATE products SET name = ?, category = ?, reorder_level = ?, cost_per_unit = ?, supplier_id = ? WHERE user_id = ? AND name = ?",
-                (new_name, category, reorder, cost, supplier_id, user_id, product_name)
+                "UPDATE products SET name = ?, category = ?, reorder_level = ?, cost_per_unit = ?, supplier_id = ?, expiry_date = ? WHERE user_id = ? AND name = ?",
+                (new_name, category, reorder, cost, supplier_id, expiry_date, user_id, product_name)
             )
             if new_name != product_name:
                 cur.execute(
@@ -602,7 +704,7 @@ def edit_product(product_name):
     
     # GET request - show form
     cur.execute(
-        "SELECT name, category, quantity, reorder_level, sales_count, cost_per_unit, supplier_id FROM products WHERE user_id = ? AND name = ?",
+        "SELECT name, category, quantity, reorder_level, sales_count, cost_per_unit, supplier_id, expiry_date FROM products WHERE user_id = ? AND name = ?",
         (user_id, product_name)
     )
     product = cur.fetchone()
@@ -623,7 +725,8 @@ def edit_product(product_name):
         "reorder": product[3],
         "sales": product[4],
         "cost": product[5],
-        "supplier_id": product[6]
+        "supplier_id": product[6],
+        "expiry_date": product[7]
     }
     
     return render_template("edit_product.html", product=product_data, suppliers=suppliers)
@@ -637,14 +740,29 @@ def view_products():
     cur = conn.cursor()
     
     cur.execute(
-        "SELECT name, category, quantity, reorder_level, sales_count, cost_per_unit FROM products WHERE user_id = ?",
+        "SELECT name, category, quantity, reorder_level, sales_count, cost_per_unit, expiry_date FROM products WHERE user_id = ?",
         (user_id,)
     )
     rows = cur.fetchall()
     conn.close()
     
     products = []
+    today = datetime.now().date()
     for r in rows:
+        days_to_expiry = None
+        expiry_status = 'OK'
+        
+        if r[6]:
+            try:
+                exp_date = datetime.strptime(r[6], '%Y-%m-%d').date()
+                days_to_expiry = (exp_date - today).days
+                if days_to_expiry < 0:
+                    expiry_status = 'EXPIRED'
+                elif days_to_expiry <= 30:
+                    expiry_status = 'EXPIRING_SOON'
+            except ValueError:
+                pass
+                
         products.append({
             "name": r[0],
             "category": r[1],
@@ -652,6 +770,9 @@ def view_products():
             "reorder": r[3],
             "sales": r[4],
             "cost": r[5],
+            "expiry_date": r[6],
+            "days_to_expiry": days_to_expiry,
+            "expiry_status": expiry_status,
             "status": get_stock_status(r[2], r[3])
         })
     
@@ -765,8 +886,7 @@ def outbound():
             )
             conn.commit()
 
-            # ── Auto email alert: comprehensive check for ALL low stock items ──
-            # Runs in background thread — never blocks the HTTP response
+            # Auto email alert — runs in background thread
             threading.Thread(target=try_send_auto_alert, args=(user_id,), daemon=True).start()
 
             flash(f"Successfully recorded outbound: {qty} units of '{name}'", "success")
@@ -782,6 +902,84 @@ def outbound():
     
     conn.close()
     return render_template("outbound.html", products=products)
+
+# ---------------- ADJUST STOCK ----------------
+@app.route("/adjust", methods=["GET", "POST"])
+@login_required
+def adjust_stock():
+    user_id = session['user_id']
+    conn = get_connection()
+    cur = conn.cursor()
+    
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        operation = request.form.get("operation", "subtract") # "add" or "subtract"
+        reason = request.form.get("reason", "Damage")
+        quantity_str = request.form.get("quantity", "0")
+        
+        if not name:
+            conn.close()
+            flash("Please select a SKU!", "error")
+            return redirect("/adjust")
+            
+        try:
+            qty = int(quantity_str)
+        except ValueError:
+            conn.close()
+            flash("Quantity must be a valid number!", "error")
+            return redirect("/adjust")
+            
+        if qty <= 0:
+            conn.close()
+            flash("Quantity must be greater than 0!", "error")
+            return redirect("/adjust")
+            
+        cur.execute("SELECT quantity FROM products WHERE user_id = ? AND name = ?", (user_id, name))
+        row = cur.fetchone()
+        
+        if not row:
+            conn.close()
+            flash("Product not found!", "error")
+            return redirect("/adjust")
+            
+        current_qty = row[0]
+        
+        if operation == "subtract" and qty > current_qty:
+            conn.close()
+            flash(f"Cannot remove {qty} units! Only {current_qty} in stock.", "error")
+            return redirect("/adjust")
+            
+        new_qty = current_qty + qty if operation == "add" else current_qty - qty
+        
+        try:
+            # Update quantity WITHOUT changing sales_count
+            cur.execute("UPDATE products SET quantity = ? WHERE user_id = ? AND name = ?", (new_qty, user_id, name))
+            
+            # Log movement as ADJ
+            mtype = f"ADJ_{operation[:3].upper()}"
+            signed_qty = qty if operation == "add" else -qty
+            
+            # We insert ADJ as movement type.
+            cur.execute(
+                "INSERT INTO stock_movements (user_id, product_name, movement_type, quantity) VALUES (?, ?, ?, ?)",
+                (user_id, name, f"ADJ_{reason.upper()[:4]}", qty)
+            )
+            conn.commit()
+            
+            op_text = "Added" if operation == "add" else "Removed"
+            flash(f"Successfully adjusted stock: {op_text} {qty} units of '{name}' ({reason}).", "success")
+        except Exception as e:
+            flash(f"Error adjusting stock: {str(e)}", "error")
+        finally:
+            conn.close()
+            
+        return redirect("/products")
+        
+    cur.execute("SELECT name, quantity FROM products WHERE user_id = ? ORDER BY name", (user_id,))
+    products = cur.fetchall()
+    conn.close()
+    
+    return render_template("adjust.html", products=products)
 
 # ---------------- REPORTS ----------------
 @app.route("/reports")
@@ -1073,19 +1271,21 @@ def refill():
 
     thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
 
-    # Get all products below reorder level, along with 30-day outbound quantity
+    # Get all products below reorder level, along with 30-day outbound quantity and supplier info
     cur.execute("""
         SELECT p.name, p.quantity, p.reorder_level, p.sales_count,
-               COALESCE(SUM(CASE WHEN s.movement_type='OUT' AND s.timestamp > ? THEN s.quantity ELSE 0 END), 0) as out_30
+               COALESCE(SUM(CASE WHEN s.movement_type='OUT' AND s.timestamp > ? THEN s.quantity ELSE 0 END), 0) as out_30,
+               sup.name, sup.phone, sup.email
         FROM products p
         LEFT JOIN stock_movements s ON p.name = s.product_name AND s.user_id = p.user_id
+        LEFT JOIN suppliers sup ON p.supplier_id = sup.id
         WHERE p.user_id = ? AND p.quantity <= p.reorder_level
         GROUP BY p.name
     """, (thirty_days_ago, user_id))
 
     refill_list = []
     for row in cur.fetchall():
-        name, qty, reorder, sales, out_30 = row
+        name, qty, reorder, sales, out_30, sup_name, sup_phone, sup_email = row
         avg_daily = round(out_30 / 30, 2) if out_30 > 0 else 0
 
         if avg_daily > 0:
@@ -1104,7 +1304,10 @@ def refill():
             'sales': sales,
             'avg_daily': avg_daily,
             'days_remaining': days_remaining,
-            'suggested_qty': suggested_qty
+            'suggested_qty': suggested_qty,
+            'supplier_name': sup_name,
+            'supplier_phone': sup_phone,
+            'supplier_email': sup_email,
         })
 
     conn.close()
@@ -1115,55 +1318,29 @@ def refill():
         x['days_remaining'] if x['days_remaining'] is not None else float('inf')
     ))
 
-    return render_template("refill.html", products=refill_list)
-
-# ─── MANUAL TEST EMAIL ALERT (from Refill page) ───
-@app.route("/send-alert", methods=["POST"])
-@login_required
-def send_alert():
-    user_id = session['user_id']
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute(
-        "SELECT email, email_alerts, username, smtp_email, smtp_pass FROM users WHERE id = ?",
-        (user_id,)
-    )
-    u = cur.fetchone()
-    conn.close()
-
-    if not u or not u[0]:
-        flash("⚠️ No recipient email set. Go to Profile Settings and add your email address.", "error")
-        return redirect("/refill")
-
-    to_email, alerts_on, username, smtp_email, smtp_pass = u
-
-    if not smtp_email or not smtp_pass:
-        flash("⚠️ SMTP credentials not configured. Go to Profile Settings → Email & SMTP Setup.", "error")
-        return redirect("/profile")
-
+    # Fetch EmailJS credentials so the template can initialise the SDK client-side
     conn2 = get_connection()
-    alert_products = get_low_stock_products(user_id, conn2)
-    conn2.close()
-
-    if not alert_products:
-        flash("✅ All stock levels are healthy right now — no alert needed!", "success")
-        return redirect("/refill")
-
-    # Bypass cooldown for manual test — always send
-    send_stock_alert_email(to_email, username, alert_products, smtp_email, smtp_pass)
-
-    # Update last_alert_sent so the auto system respects the cooldown
-    conn3 = get_connection()
-    conn3.execute(
-        "UPDATE users SET last_alert_sent = ? WHERE id = ?",
-        (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user_id)
+    cur2  = conn2.cursor()
+    cur2.execute(
+        "SELECT email, emailjs_service_id, emailjs_template_id, emailjs_public_key, username "
+        "FROM users WHERE id = ?",
+        (session['user_id'],)
     )
-    conn3.commit()
-    conn3.close()
+    urow = cur2.fetchone()
+    conn2.close()
+    recipient_email, ejs_svc, ejs_tpl, ejs_key, uname = urow if urow else ('', '', '', '', '')
+    emailjs_ok = bool(ejs_svc and ejs_tpl and ejs_key and recipient_email)
 
-    flash(f"📧 Test alert email sent to {to_email} with {len(alert_products)} low-stock item(s)!", "success")
-    return redirect("/refill")
+    return render_template(
+        "refill.html",
+        products=refill_list,
+        emailjs_service_id=ejs_svc   or '',
+        emailjs_template_id=ejs_tpl  or '',
+        emailjs_public_key=ejs_key   or '',
+        recipient_email=recipient_email or '',
+        username=uname or session.get('username', 'User'),
+        emailjs_ok=emailjs_ok,
+    )
 
 # ─── PROFILE / SETTINGS ───
 @app.route("/profile", methods=["GET", "POST"])
@@ -1176,29 +1353,32 @@ def profile():
     if request.method == "POST":
         action = request.form.get("action", "")
 
-        if action == "update_email":
-            new_email    = request.form.get("email", "").strip()
-            email_alerts = 1 if request.form.get("email_alerts") else 0
-            new_smtp_email = request.form.get("smtp_email", "").strip()
-            new_smtp_pass  = request.form.get("smtp_pass", "").strip()
+        if action == "update_emailjs":
+            new_email      = request.form.get("email", "").strip()
+            service_id     = request.form.get("emailjs_service_id", "").strip()
+            template_id    = request.form.get("emailjs_template_id", "").strip()
+            public_key     = request.form.get("emailjs_public_key", "").strip()
+            private_key    = request.form.get("emailjs_private_key", "").strip()
+            email_alerts   = 1 if request.form.get("email_alerts") else 0
 
             if new_email and "@" not in new_email:
                 flash("Please enter a valid recipient email address.", "error")
-            elif new_smtp_email and "@" not in new_smtp_email:
-                flash("Please enter a valid Gmail address for SMTP.", "error")
             else:
                 cur.execute(
-                    "UPDATE users SET email = ?, email_alerts = ?, smtp_email = ?, smtp_pass = ? WHERE id = ?",
+                    "UPDATE users SET email = ?, emailjs_service_id = ?, emailjs_template_id = ?, "
+                    "emailjs_public_key = ?, emailjs_private_key = ?, email_alerts = ? WHERE id = ?",
                     (
                         new_email or None,
+                        service_id or None,
+                        template_id or None,
+                        public_key or None,
+                        private_key or None,
                         email_alerts,
-                        new_smtp_email or None,
-                        new_smtp_pass or None,
                         user_id
                     )
                 )
                 conn.commit()
-                flash("✅ Email & SMTP settings saved! Automatic alerts are now active.", "success")
+                flash("✅ EmailJS settings saved! Test your alert from the Refill page.", "success")
 
         elif action == "change_password":
             current_pw  = request.form.get("current_password", "")
@@ -1208,6 +1388,8 @@ def profile():
             row = cur.fetchone()
             if not row or not check_password_hash(row[0], current_pw):
                 flash("Current password is incorrect.", "error")
+            elif new_pw == current_pw:
+                flash("New password must be different from current password.", "error")
             elif len(new_pw) < 6:
                 flash("New password must be at least 6 characters.", "error")
             elif new_pw != confirm_pw:
@@ -1223,15 +1405,21 @@ def profile():
         conn.close()
         return redirect("/profile")
 
-    cur.execute("SELECT username, email, email_alerts, smtp_email, smtp_pass FROM users WHERE id = ?", (user_id,))
+    cur.execute(
+        "SELECT username, email, email_alerts, emailjs_service_id, emailjs_template_id, emailjs_public_key, emailjs_private_key "
+        "FROM users WHERE id = ?",
+        (user_id,)
+    )
     row = cur.fetchone()
     conn.close()
     user_data = {
-        'username':     row[0] if row else session.get('username', ''),
-        'email':        row[1] if row else '',
-        'email_alerts': row[2] if row else 1,
-        'smtp_email':   row[3] if row else '',
-        'smtp_pass':    row[4] if row else '',
+        'username':             row[0] if row else session.get('username', ''),
+        'email':                row[1] if row else '',
+        'email_alerts':         row[2] if row else 1,
+        'emailjs_service_id':   row[3] if row else '',
+        'emailjs_template_id':  row[4] if row else '',
+        'emailjs_public_key':   row[5] if row else '',
+        'emailjs_private_key':  row[6] if row else '',
     }
     return render_template("profile.html", user=user_data)
 
@@ -1298,19 +1486,21 @@ def export_csv():
             return redirect("/history")
         
         def generate():
-            yield "SKU,SKU Name,Category,Movement,Quantity,Date & Time\n"
+            # UTF-8 BOM for Excel to recognize encoding (₹ symbol)
+            yield "\ufeff"
+            yield '"SKU","SKU Name","Category","Movement","Quantity","Date & Time"\n'
             for r in rows:
                 sku_id = r[0] if r[0] else "N/A"
-                sku_name = r[1] if r[1] else "Unknown"
-                category = r[2] if r[2] else "Uncategorized"
+                sku_name = (r[1] if r[1] else "Unknown").replace('"', '""')
+                category = (r[2] if r[2] else "Uncategorized").replace('"', '""')
                 movement = r[3]
                 quantity = r[4]
                 timestamp = convert_to_ist(r[5])
-                yield f"{sku_id},{sku_name},{category},{movement},{quantity},{timestamp}\n"
+                yield f'"{sku_id}","{sku_name}","{category}","{movement}","{quantity}","{timestamp}"\n'
         
         return Response(
             generate(),
-            mimetype="text/csv",
+            mimetype="text/csv; charset=utf-8",
             headers={"Content-Disposition": "attachment; filename=movement_report.csv"}
         )
     except Exception as e:
