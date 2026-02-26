@@ -28,11 +28,13 @@
             <div class="sidebar-label">Operations</div>
             <a href="/inbound"><i class="fas fa-arrow-circle-down"></i> Inbound</a>
             <a href="/outbound"><i class="fas fa-arrow-circle-up"></i> Outbound</a>
+            <a href="/adjust"><i class="fas fa-sliders-h"></i> Adjust Stock</a>
             <a href="/refill"><i class="fas fa-bell"></i> Refill Alerts</a>
             <div class="sidebar-label">Analytics</div>
             <a href="/reports"><i class="fas fa-chart-pie"></i> Reports</a>
             <a href="/history"><i class="fas fa-history"></i> Movement History</a>
             <a href="/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
+            <a href="/profile"><i class="fas fa-cog"></i> Profile Settings</a>
         </nav>
         <div class="sidebar-footer">
             <div class="sidebar-user">
@@ -69,13 +71,13 @@
                 <div class="stat-card purple fade-in delay-1">
                     <i class="fas fa-cubes stat-icon"></i>
                     <div class="stat-label"><i class="fas fa-cube"></i> Total SKUs</div>
-                    <div class="stat-value">{{ total_skus }}</div>
+                    <div class="stat-value" style="color:var(--text)">{{ total_skus }}</div>
                     <div class="stat-sub">Active products in warehouse</div>
                 </div>
                 <div class="stat-card amber fade-in delay-2">
                     <i class="fas fa-exclamation-triangle stat-icon"></i>
                     <div class="stat-label"><i class="fas fa-exclamation-triangle"></i> Low Stock</div>
-                    <div class="stat-value" style="color:#fbbf24">{{ low }}</div>
+                    <div class="stat-value" style="color:var(--accent)">{{ low }}</div>
                     <div class="stat-sub">Items approaching reorder level</div>
                 </div>
                 <div class="stat-card red fade-in delay-3">
@@ -87,21 +89,66 @@
                 <div class="stat-card green fade-in delay-4">
                     <i class="fas fa-coins stat-icon"></i>
                     <div class="stat-label"><i class="fas fa-coins"></i> Inventory Value</div>
-                    <div class="stat-value" style="font-size:22px;color:var(--green)">₹{{ "{:,.0f}".format(total_value)
-                        }}</div>
+                    <div class="stat-value" style="font-size:22px;color:var(--green)">₹{{ total_value|indian }}</div>
                     <div class="stat-sub">Cost of goods on hand</div>
                 </div>
             </div>
 
-            <!-- Charts Row -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px" class="fade-in">
-                <div class="chart-card">
-                    <div class="chart-title"><i class="fas fa-exchange-alt"></i> Today's Stock Movement</div>
+            <!-- Top Charts Row -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:20px;margin-bottom:24px"
+                class="fade-in">
+                <div class="glass-card" style="padding:24px">
+                    <div style="display:flex;align-items:center;margin-bottom:16px">
+                        <i class="fas fa-exchange-alt"
+                            style="color:var(--primary2);font-size:16px;margin-right:10px"></i>
+                        <span style="font-weight:700;font-size:15px">Today's Stock Movement</span>
+                    </div>
                     <div style="height:240px;position:relative"><canvas id="movementChart"></canvas></div>
                 </div>
-                <div class="chart-card">
-                    <div class="chart-title"><i class="fas fa-signal"></i> Stock Health Overview</div>
-                    <div style="height:240px;position:relative"><canvas id="healthChart"></canvas></div>
+
+                <!-- Category Chart -->
+                <div class="glass-card" style="padding:24px">
+                    <div style="margin-bottom:16px">
+                        <div style="display:flex;align-items:center;gap:10px">
+                            <i class="fas fa-chart-pie" style="color:var(--primary);font-size:16px"></i>
+                            <span style="font-weight:700;font-size:15px">Category Distribution</span>
+                        </div>
+                    </div>
+                    <div style="height:240px;position:relative;display:flex;align-items:center;justify-content:center">
+                        {% if cat_labels|length > 0 %}
+                        <canvas id="categoryChart"></canvas>
+                        {% else %}
+                        <div style="color:var(--muted);font-size:14px"><i class="fas fa-info-circle"></i> No category
+                            data available</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Full-Width Trend Chart -->
+            <div style="width:100%;margin-bottom:24px" class="fade-in">
+                <div class="glass-card" style="padding:24px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                        <div style="display:flex;align-items:center;gap:10px">
+                            <i class="fas fa-chart-area" style="color:var(--primary2);font-size:16px"></i>
+                            <span style="font-weight:700;font-size:15px">30-Day Movement Trend</span>
+                        </div>
+                        <div style="display:flex;gap:14px;font-size:12px">
+                            <span style="display:flex;align-items:center;gap:5px">
+                                <span
+                                    style="width:10px;height:10px;border-radius:50%;background:#34d399;display:inline-block"></span>
+                                Inbound
+                            </span>
+                            <span style="display:flex;align-items:center;gap:5px">
+                                <span
+                                    style="width:10px;height:10px;border-radius:50%;background:#f87171;display:inline-block"></span>
+                                Outbound
+                            </span>
+                        </div>
+                    </div>
+                    <div style="height:280px;position:relative">
+                        <canvas id="trendChart"></canvas>
+                    </div>
                 </div>
             </div>
 
@@ -127,8 +174,8 @@
             </div>
 
             <!-- Alert Banner -->
-            {% if critical > 0 or low > 0 %}
-            <div class="info-box red fade-in">
+            {% if critical > 0 or low > 0 or expiring_soon|length > 0 %}
+            <div class="info-box red fade-in" style="margin-bottom:24px">
                 <h6><i class="fas fa-bell"></i> Inventory Alerts</h6>
                 {% if critical > 0 %}
                 <p style="margin-bottom:8px"><strong style="color:var(--red)">⚠ {{ critical }} critical
@@ -138,17 +185,41 @@
                 <p style="margin-bottom:12px"><strong style="color:#fbbf24">ℹ {{ low }} low-stock product(s)</strong> —
                     Consider placing a refill order.</p>
                 {% endif %}
-                <a href="/refill" class="btn-glow" style="display:inline-flex"><i class="fas fa-check-circle"></i> View
-                    Refill Alerts</a>
-            </div>
-            {% else %}
-            <div class="info-box green fade-in">
-                <h6><i class="fas fa-check-circle"></i> All Systems Healthy</h6>
-                <p>All inventory levels are within normal range. No immediate action required.</p>
+
+                {% if expiring_soon|length > 0 %}
+                <div style="margin-top:12px;padding-top:12px;border-top:1px dashed rgba(255,255,255,0.1)">
+                    <p style="margin-bottom:8px"><strong><i class="fas fa-clock" style="color:#fbbf24"></i> {{
+                            expiring_soon|length }} product(s) expiring soon:</strong></p>
+                    <div
+                        style="background:rgba(0,0,0,0.2);padding:10px 14px;border-radius:8px;font-size:13px;max-height:140px;overflow-y:auto">
+                        {% for item in expiring_soon %}
+                        {% set color_val = 'var(--red)' if item.days < 0 else 'var(--yellow)' %} <div
+                            style="display:flex;justify-content:space-between;margin-bottom:6px;border-bottom:1px dashed rgba(255,255,255,0.05);padding-bottom:4px">
+                            <span><strong style="color:var(--text-color)">{{ item.name }}</strong> <span
+                                    style="color:var(--muted)">({{ item.quantity }} units)</span></span>
+                            <span style="color:{{ color_val }}">
+                                {% if item.days < 0 %}Expired{% else %}In {{ item.days }} days{% endif %} <span
+                                    style="opacity:0.6;font-size:11px;color:var(--text-color)">({{ item.date }})</span>
+                            </span>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
             {% endif %}
 
-        </div><!-- /page-body -->
+            <div style="margin-top:16px">
+                <a href="/refill" class="btn-glow" style="display:inline-flex"><i class="fas fa-check-circle"></i>
+                    View Refill Alerts</a>
+            </div>
+        </div>
+        {% else %}
+        <div class="info-box green fade-in">
+            <h6><i class="fas fa-check-circle"></i> All Systems Healthy</h6>
+            <p>All inventory levels are within normal range. No immediate action required.</p>
+        </div>
+        {% endif %}
+
+    </div><!-- /page-body -->
     </div><!-- /main -->
 
     <script src="/static/enhancements.js"></script>
@@ -161,17 +232,18 @@
         }
         tick(); setInterval(tick, 1000);
 
-        // Chart defaults
-        Chart.defaults.color = 'rgba(255,255,255,0.55)';
-        Chart.defaults.borderColor = 'rgba(255,255,255,0.07)';
+        // Chart defaults (theme-aware)
+        const _isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        Chart.defaults.color = _isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)';
+        Chart.defaults.borderColor = _isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.07)';
         Chart.defaults.font.family = "'Inter', sans-serif";
 
-        const inbound = {{ inbound }};
-        const outbound = {{ outbound }};
-        const low = {{ low }};
-        const critical = {{ critical }};
-        const total = {{ total_skus }};
-        const normal = total - low - critical;
+        var inbound = {{ inbound }};
+        var outbound = {{ outbound }};
+        var low = {{ low }};
+        var critical = {{ critical }};
+        var total = {{ total_skus }};
+        var normal = total - low - critical;
 
         // Movement chart (bar)
         new Chart(document.getElementById('movementChart'), {
@@ -196,25 +268,110 @@
             }
         });
 
-        // Health donut
-        new Chart(document.getElementById('healthChart'), {
-            type: 'doughnut',
-            data: {
-                labels: ['Normal', 'Low Stock', 'Critical'],
-                datasets: [{
-                    data: [normal, low, critical],
-                    backgroundColor: ['rgba(52,211,153,0.8)', 'rgba(251,191,36,0.8)', 'rgba(248,113,113,0.8)'],
-                    borderColor: ['#34d399', '#fbbf24', '#f87171'],
-                    borderWidth: 2, hoverOffset: 8
-                }]
+
+
+        // 30-Day Trend line chart
+        const trendCtx = document.getElementById('trendChart');
+        if (trendCtx) {
+            const tCtx = trendCtx.getContext('2d');
+            const greenGrad = tCtx.createLinearGradient(0, 0, 0, 260);
+            greenGrad.addColorStop(0, 'rgba(52,211,153,0.35)');
+            greenGrad.addColorStop(1, 'rgba(52,211,153,0.02)');
+            const redGrad = tCtx.createLinearGradient(0, 0, 0, 260);
+            redGrad.addColorStop(0, 'rgba(248,113,113,0.30)');
+            redGrad.addColorStop(1, 'rgba(248,113,113,0.02)');
+
+            new Chart(tCtx, {
+                type: 'line',
+                data: {
+                    labels: {{ trend_labels | tojson | safe }},
+        datasets: [
+            {
+                label: 'Inbound',
+                data: {{ trend_in | tojson | safe }},
+            borderColor: '#34d399',
+            backgroundColor: greenGrad,
+            fill: true,
+            tension: 0.35,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+            borderWidth: 2,
+                        },
+            {
+                label: 'Outbound',
+                data: {{ trend_out | tojson | safe }},
+            borderColor: '#f87171',
+            backgroundColor: redGrad,
+            fill: true,
+            tension: 0.35,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+            borderWidth: 2,
+                        }
+        ]
+                },
+        options: {
+            responsive: true,
+                maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(15,14,23,0.92)',
+                        padding: 12,
+                            titleFont: { weight: '600' },
+                    callbacks: {
+                        label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} units`
+                    }
+                }
             },
-            options: {
-                responsive: true, maintainAspectRatio: false, cutout: '68%',
-                plugins: {
-                    legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, font: { size: 12 } } }
+            scales: {
+                y: {
+                    beginAtZero: true,
+                        grid: { color: _isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)' },
+                    ticks: { stepSize: 1 }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        maxTicksLimit: 10,
+                            font: { size: 10 }
+                    }
                 }
             }
-        });
+        }
+            });
+        }
+
+        // Category donut chart
+        const catCtx = document.getElementById('categoryChart');
+        if (catCtx) {
+            new Chart(catCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: {{ cat_labels | tojson | safe }},
+        datasets: [{
+            data: {{ cat_values | tojson | safe }},
+            backgroundColor: [
+            '#6c63ff', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'
+        ],
+            borderWidth: 2,
+            hoverOffset: 6
+                    }]
+                },
+        options: {
+            responsive: true, maintainAspectRatio: false, cutout: '60%',
+                plugins: {
+                legend: { position: 'right', labels: { usePointStyle: true, padding: 15, font: { size: 11 } } },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ` ${ctx.label}: ₹${ctx.raw.toLocaleString('en-IN')}`
+                    }
+                }
+            }
+        }
+            });
+        }
     </script>
 </body>
 
