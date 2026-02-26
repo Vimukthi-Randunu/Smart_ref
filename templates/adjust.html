@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adjust Stock — SmartRefill</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/dark-theme.css">
+</head>
+
+<body>
+
+    <aside class="sidebar">
+        <a href="/dashboard" class="sidebar-brand">
+            <div class="logo-icon"><i class="fas fa-cubes"></i></div><span>SmartRefill</span>
+        </a>
+        <nav class="sidebar-nav">
+            <div class="sidebar-label">Main</div>
+            <a href="/dashboard"><i class="fas fa-chart-line"></i> Dashboard</a>
+            <a href="/products"><i class="fas fa-boxes"></i> Warehouse Stock</a>
+            <a href="/add"><i class="fas fa-plus-circle"></i> Add SKU</a>
+            <div class="sidebar-label">Operations</div>
+            <a href="/inbound"><i class="fas fa-arrow-circle-down"></i> Inbound</a>
+            <a href="/outbound"><i class="fas fa-arrow-circle-up"></i> Outbound</a>
+            <a href="/adjust" class="active"><i class="fas fa-sliders-h"></i> Adjust Stock</a>
+            <a href="/refill"><i class="fas fa-bell"></i> Refill Alerts</a>
+            <div class="sidebar-label">Analytics</div>
+            <a href="/reports"><i class="fas fa-chart-pie"></i> Reports</a>
+            <a href="/history"><i class="fas fa-history"></i> Movement History</a>
+            <a href="/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
+            <div class="sidebar-label">Settings</div>
+            <a href="/profile"><i class="fas fa-cog"></i> Profile Settings</a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="user-avatar-circle"><i class="fas fa-user"></i></div>
+                <div>
+                    <div class="uname">{{ session.get('username','User') }}</div>
+                    <div class="urole">Warehouse Manager</div>
+                </div>
+            </div>
+            <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </aside>
+
+    <div class="main">
+        <div class="topbar">
+            <div class="topbar-left">
+                <h1><i class="fas fa-sliders-h" style="color:var(--yellow);margin-right:10px"></i>Adjust Stock</h1>
+                <p>Record damages, expiry, or audit corrections</p>
+            </div>
+            <div class="topbar-right">
+                <a href="/products" class="btn-ghost"><i class="fas fa-arrow-left"></i> Back to Stock</a>
+            </div>
+        </div>
+
+        <div class="page-body">
+            <div style="max-width:600px;margin:0 auto">
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}{% for cat, msg in messages %}
+                <div class="flash flash-{{ 'error' if cat=='error' else 'success' }} fade-in">
+                    <i class="fas fa-{{ 'exclamation-circle' if cat=='error' else 'check-circle' }}"></i>{{ msg }}
+                </div>
+                {% endfor %}{% endif %}
+                {% endwith %}
+
+                <!-- Hero indicator -->
+                <div class="glass-card fade-in"
+                    style="padding:24px 28px;margin-bottom:24px;border-top:3px solid var(--yellow);display:flex;gap:16px;align-items:center">
+                    <div
+                        style="width:52px;height:52px;background:rgba(251,191,36,.15);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--yellow);flex-shrink:0">
+                        <i class="fas fa-balance-scale"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight:700;font-size:15px;margin-bottom:3px">Non-Sales Adjustments</div>
+                        <div style="color:var(--muted);font-size:13px">Use this for damaged goods, expired items, or
+                            physical audit discrepancies. Adjustments do not inflate lifetime sales.</div>
+                    </div>
+                </div>
+
+                <div class="form-card fade-in">
+                    <form action="/adjust" method="post" onsubmit="return validateAdjust()">
+
+                        <div class="form-group">
+                            <label><i class="fas fa-cube"></i> Select SKU <span
+                                    style="color:var(--red)">*</span></label>
+                            <select id="productSelect" name="name" required class="form-control"
+                                onchange="updateAvail()">
+                                <option value="">— Choose a SKU —</option>
+                                {% for p in products %}
+                                <option value="{{ p[0] }}">{{ p[0] }} ({{ p[1] }} units)</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                            <div class="form-group">
+                                <label><i class="fas fa-exchange-alt"></i> Operation <span
+                                        style="color:var(--red)">*</span></label>
+                                <select id="operation" name="operation" required class="form-control">
+                                    <option value="subtract">Subtract from Stock</option>
+                                    <option value="add">Add to Stock</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-hashtag"></i> Quantity <span
+                                        style="color:var(--red)">*</span></label>
+                                <input type="number" id="quantityInput" name="quantity" class="form-control"
+                                    placeholder="e.g. 5" min="1" required>
+                                <div id="availText" style="margin-top:6px;font-size:12px;color:var(--muted)"></div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label><i class="fas fa-comment-dots"></i> Reason <span
+                                    style="color:var(--red)">*</span></label>
+                            <select id="reason" name="reason" required class="form-control">
+                                <option value="Damage">Damage / Broken</option>
+                                <option value="Expired">Expired</option>
+                                <option value="Audit">Audit Recount</option>
+                                <option value="Lost">Lost / Stolen</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px">
+                            <button type="submit" class="btn-glow"><i class="fas fa-check-circle"></i> Submit
+                                Adjustment</button>
+                            <a href="/products" class="btn-ghost"><i class="fas fa-times"></i> Cancel</a>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const productData = {
+          {% for p in products %} "{{ p[0] }}": { { p[1] } }, {% endfor %}
+        };
+
+        function updateAvail() {
+            const v = document.getElementById('productSelect').value;
+            const el = document.getElementById('availText');
+            if (v && productData[v] !== undefined) {
+                el.innerHTML = `<i class="fas fa-info-circle" style="color:var(--primary2)"></i> Current: <strong style="color:var(--green)">${productData[v]} units</strong>`;
+            } else {
+                el.textContent = '';
+            }
+        }
+
+        function validateAdjust() {
+            const sel = document.getElementById('productSelect').value;
+            const qty = parseInt(document.getElementById('quantityInput').value);
+            const op = document.getElementById('operation').value;
+
+            if (!sel) { alert('Please select a SKU'); return false; }
+            if (!qty || qty <= 0) { alert('Enter a valid quantity'); return false; }
+
+            if (op === 'subtract' && productData[sel] !== undefined && qty > productData[sel]) {
+                alert(`Cannot remove ${qty} units. Only ${productData[sel]} available.`);
+                return false;
+            }
+            return true;
+        }
+    </script>
+    <script src="/static/enhancements.js"></script>
+</body>
+
+</html>
