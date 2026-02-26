@@ -5,43 +5,99 @@
  */
 
 // ============================================================
-// DARK MODE TOGGLE
+// THEME TOGGLE (Dark ↔ Light)
 // ============================================================
 
-const darkModeToggle = document.querySelector('.dark-mode-toggle');
-
-if (darkModeToggle) {
-    // Check for saved preference
-    if (localStorage.getItem('darkMode') === 'enabled') {
-        document.body.classList.add('dark-mode');
-        // Wait for SmartRefill to be initialized before updating icon if needed
-        // but updateToggleIcon is global so it works
-        updateToggleIcon();
+(function initTheme() {
+    // Apply saved theme immediately (before DOM ready to avoid flash)
+    const saved = localStorage.getItem('smartrefill-theme');
+    if (saved === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
     }
 
-    darkModeToggle.addEventListener('click', function () {
-        // Use the exposed function if available, otherwise fallback (though it should be available)
-        if (window.SmartRefill && window.SmartRefill.toggleDarkMode) {
-            window.SmartRefill.toggleDarkMode();
-        } else {
-            // Fallback just in case
-            document.body.classList.toggle('dark-mode');
-            localStorage.setItem('darkMode', document.body.classList.contains('dark-mode') ? 'enabled' : 'disabled');
-            updateToggleIcon();
+    document.addEventListener('DOMContentLoaded', () => {
+        // Inject toggle button into sidebar footer
+        const footer = document.querySelector('.sidebar-footer');
+        if (footer) {
+            const btn = document.createElement('button');
+            btn.className = 'theme-toggle-btn';
+            btn.id = 'themeToggle';
+            updateThemeButton(btn);
+            footer.insertBefore(btn, footer.firstChild);
+
+            btn.addEventListener('click', () => {
+                const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+                if (isLight) {
+                    document.documentElement.removeAttribute('data-theme');
+                    localStorage.setItem('smartrefill-theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    localStorage.setItem('smartrefill-theme', 'light');
+                }
+                updateThemeButton(btn);
+                updateChartColors();
+            });
         }
     });
-}
 
-function updateToggleIcon() {
-    const toggle = document.querySelector('.dark-mode-toggle');
-    if (!toggle) return;
-
-    if (document.body.classList.contains('dark-mode')) {
-        toggle.innerHTML = '<i class="fas fa-sun"></i> Light Mode';
-    } else {
-        toggle.innerHTML = '<i class="fas fa-moon"></i> Dark Mode';
+    function updateThemeButton(btn) {
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        btn.innerHTML = isLight
+            ? '<i class="fas fa-moon"></i> Dark Mode'
+            : '<i class="fas fa-sun"></i> Light Mode';
     }
-}
+
+    function updateChartColors() {
+        if (typeof Chart === 'undefined') return;
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        Chart.defaults.color = isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)';
+        Chart.defaults.borderColor = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.07)';
+        // Re-render all charts
+        Chart.helpers.each(Chart.instances, chart => {
+            chart.update('none');
+        });
+    }
+})();
+
+// ============================================================
+// AUTO-INJECT: Favicon + Mobile Hamburger Menu
+// ============================================================
+
+(function injectUI() {
+    // Favicon
+    if (!document.querySelector('link[rel="icon"]')) {
+        const fav = document.createElement('link');
+        fav.rel = 'icon';
+        fav.type = 'image/svg+xml';
+        fav.href = '/static/favicon.svg';
+        document.head.appendChild(fav);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const sidebar = document.querySelector('.sidebar');
+        if (!sidebar) return;
+
+        // Create hamburger button
+        const burger = document.createElement('button');
+        burger.className = 'hamburger-btn';
+        burger.innerHTML = '<i class="fas fa-bars"></i>';
+        burger.setAttribute('aria-label', 'Toggle menu');
+        document.body.appendChild(burger);
+
+        // Create backdrop
+        const backdrop = document.createElement('div');
+        backdrop.className = 'sidebar-backdrop';
+        document.body.appendChild(backdrop);
+
+        function toggle() {
+            sidebar.classList.toggle('sidebar-open');
+            backdrop.classList.toggle('backdrop-active');
+        }
+
+        burger.addEventListener('click', toggle);
+        backdrop.addEventListener('click', toggle);
+    });
+})();
 
 // ============================================================
 // BARCODE SCANNER SUPPORT
@@ -209,37 +265,75 @@ document.addEventListener('DOMContentLoaded', initBarcodeScanners);
 // EXPORT TO CSV
 // ============================================================
 
-function exportTableToCSV(filename = 'export.csv') {
+function exportTableToCSV(filename = 'export.xls') {
     const table = document.querySelector('table');
     if (!table) {
         alert('No table found to export');
         return;
     }
 
-    let csv = [];
-    const rows = table.querySelectorAll('tr');
+    // Build HTML table for Excel with auto-sized columns
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">';
+    html += '<head><meta charset="utf-8">';
+    html += '<style>td,th{mso-number-format:"\\@";white-space:nowrap;padding:4px 12px;border:1px solid #ccc;font-family:Calibri,sans-serif;font-size:11pt}';
+    html += 'th{background:#4472C4;color:#fff;font-weight:bold}';
+    html += 'tr:nth-child(even){background:#f2f2f2}</style></head><body>';
+    html += '<table>';
 
-    rows.forEach(row => {
+    const rows = table.querySelectorAll('tr');
+    rows.forEach((row, i) => {
+        // Skip hidden rows (filtered out)
+        if (row.style.display === 'none') return;
+        html += '<tr>';
         const cols = row.querySelectorAll('td, th');
-        const csvRow = [];
+        const tag = i === 0 ? 'th' : 'td';
         cols.forEach(col => {
-            csvRow.push('"' + col.innerText.replace(/"/g, '""') + '"');
+            let text = col.innerText.replace(/\s+/g, ' ').trim();
+            html += `<${tag}>${text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</${tag}>`;
         });
-        csv.push(csvRow.join(','));
+        html += '</tr>';
     });
 
-    downloadCSV(csv.join('\n'), filename);
-}
+    html += '</table></body></html>';
 
-function downloadCSV(csv, filename) {
-    const csvFile = new Blob([csv], { type: 'text/csv' });
+    // Ensure .xls extension
+    if (!filename.endsWith('.xls')) {
+        filename = filename.replace(/\.\w+$/, '.xls');
+    }
+
+    const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const downloadLink = document.createElement('a');
-    downloadLink.href = URL.createObjectURL(csvFile);
+    downloadLink.href = URL.createObjectURL(blob);
     downloadLink.download = filename;
     document.body.appendChild(downloadLink);
     downloadLink.click();
     document.body.removeChild(downloadLink);
 }
+
+// ============================================================
+// PRINT: Fix Chart.js legends (white text → black for print)
+// ============================================================
+
+window.addEventListener('beforeprint', () => {
+    if (typeof Chart !== 'undefined') {
+        Chart.helpers.each(Chart.instances, chart => {
+            chart.options.plugins.legend.labels.color = '#222';
+            chart.options.plugins.legend.labels.font = { ...chart.options.plugins.legend.labels.font, weight: 'bold' };
+            chart.update('none');
+        });
+    }
+});
+
+window.addEventListener('afterprint', () => {
+    if (typeof Chart !== 'undefined') {
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        const labelColor = isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)';
+        Chart.helpers.each(Chart.instances, chart => {
+            chart.options.plugins.legend.labels.color = labelColor;
+            chart.update('none');
+        });
+    }
+});
 
 // ============================================================
 // TABLE FILTERING & SEARCH
