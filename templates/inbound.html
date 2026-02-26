@@ -25,11 +25,13 @@
             <div class="sidebar-label">Operations</div>
             <a href="/inbound" class="active"><i class="fas fa-arrow-circle-down"></i> Inbound</a>
             <a href="/outbound"><i class="fas fa-arrow-circle-up"></i> Outbound</a>
+            <a href="/adjust"><i class="fas fa-sliders-h"></i> Adjust Stock</a>
             <a href="/refill"><i class="fas fa-bell"></i> Refill Alerts</a>
             <div class="sidebar-label">Analytics</div>
             <a href="/reports"><i class="fas fa-chart-pie"></i> Reports</a>
             <a href="/history"><i class="fas fa-history"></i> Movement History</a>
             <a href="/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
+            <a href="/profile"><i class="fas fa-cog"></i> Profile Settings</a>
         </nav>
         <div class="sidebar-footer">
             <div class="sidebar-user">
@@ -151,6 +153,10 @@
                 const sel = document.getElementById('productSelect');
                 sel.value = product;
                 sel.style.borderColor = 'var(--green)';
+                // Focus quantity field since SKU is already selected
+                document.getElementById('quantityInput').focus();
+                // Remove autofocus from search field
+                document.getElementById('product-lookup').removeAttribute('autofocus');
             }
         });
     </script>

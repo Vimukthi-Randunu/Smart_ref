@@ -25,12 +25,13 @@
             <div class="sidebar-label">Operations</div>
             <a href="/inbound"><i class="fas fa-arrow-circle-down"></i> Inbound</a>
             <a href="/outbound"><i class="fas fa-arrow-circle-up"></i> Outbound</a>
+            <a href="/adjust"><i class="fas fa-sliders-h"></i> Adjust Stock</a>
             <a href="/refill" class="active"><i class="fas fa-bell"></i> Refill Alerts</a>
             <div class="sidebar-label">Analytics</div>
             <a href="/reports"><i class="fas fa-chart-pie"></i> Reports</a>
             <a href="/history"><i class="fas fa-history"></i> Movement History</a>
             <a href="/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
-            <a href="/profile"><i class="fas fa-user-cog"></i> Profile Settings</a>
+            <a href="/profile"><i class="fas fa-cog"></i> Profile Settings</a>
         </nav>
         <div class="sidebar-footer">
             <div class="sidebar-user">
@@ -51,22 +52,34 @@
                 <p>SKUs requiring immediate restocking attention</p>
             </div>
             <div class="topbar-right">
+                <!-- EmailJS config status badge -->
+                {% if emailjs_ok %}
                 <span
                     style="font-size:12px;color:#34d399;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);border-radius:20px;padding:6px 14px;font-weight:600">
-                    <i class="fas fa-bolt"></i> Auto-alerts active
+                    <i class="fas fa-bolt"></i> Email alerts ready
                 </span>
-                <form method="POST" action="/send-alert" style="display:inline">
-                    <button type="submit" class="btn-ghost" id="btn-send-alert"
-                        style="border-color:rgba(245,158,11,.4);color:#fbbf24"
-                        title="Manually send a test alert email to verify your SMTP setup">
-                        <i class="fas fa-paper-plane"></i> Test Alert Email
-                    </button>
-                </form>
+                {% else %}
+                <a href="/profile"
+                    style="font-size:12px;color:#fbbf24;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:20px;padding:6px 14px;font-weight:600;text-decoration:none">
+                    <i class="fas fa-exclamation-triangle"></i> Configure email →
+                </a>
+                {% endif %}
+
+
+                <a href="/profile"
+                    style="font-size:11px;color:var(--muted);text-decoration:none;display:flex;align-items:center;gap:4px">
+                    <i class="fas fa-cog"></i> Email Setup
+                </a>
                 <a href="/products" class="btn-ghost"><i class="fas fa-boxes"></i> View All Stock</a>
             </div>
         </div>
 
         <div class="page-body">
+
+            <!-- Inline toast notification area -->
+            <div id="email-toast"
+                style="display:none;animation:fadeInUp .35s ease both;align-items:center;gap:10px;padding:14px 18px;border-radius:10px;margin-bottom:18px;font-weight:600;font-size:14px">
+            </div>
 
             {% if products|length == 0 %}
             <!-- All good state -->
@@ -84,7 +97,7 @@
 
             <!-- AI Legend -->
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;align-items:center" class="fade-in">
-                <span style="color:var(--muted);font-size:12px;font-weight:600"><i class="fas fa-robot"
+                <span style="font-weight:600;font-size:12px;color:var(--muted)"><i class="fas fa-brain"
                         style="color:var(--primary2)"></i> AI Days-Remaining Prediction:</span>
                 <span class="badge-pill"
                     style="background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.25)">🔴
@@ -97,17 +110,29 @@
                     days — Watch</span>
             </div>
 
+            <!-- Search / Filter -->
+            <div style="display:flex;gap:12px;align-items:center;margin-bottom:18px" class="fade-in">
+                <div style="position:relative;flex:1;max-width:400px">
+                    <i class="fas fa-search"
+                        style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px"></i>
+                    <input type="text" id="refillSearch" class="form-control" placeholder="Search products…"
+                        style="padding-left:38px" oninput="filterRefillCards()">
+                </div>
+                <span style="font-size:12px;color:var(--muted)" id="refillCount">{{ products|length }} items</span>
+            </div>
+
             <!-- Refill Cards Grid -->
             <div
                 style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-bottom:24px">
                 {% for p in products %}
-                <div class="glass-card fade-in"
+                <div class="glass-card fade-in refill-card" data-name="{{ p.name|lower }}"
                     style="padding:22px;border-top:3px solid {% if p.quantity <= 0 %}var(--red){% elif p.days_remaining is not none and p.days_remaining < 3 %}var(--red){% elif p.days_remaining is not none and p.days_remaining < 7 %}#fbbf24{% else %}var(--green){% endif %};animation-delay:{{ loop.index0 * 0.05 }}s">
 
                     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
                         <div>
                             <div style="font-weight:700;font-size:15px;margin-bottom:4px">{{ p.name }}</div>
-                            {% if p.quantity <= 0 %} <span class="badge-pill badge-critical"><i class="fas fa-fire"></i>
+                            {% if p.quantity <= (p.reorder / 2) %} <span class="badge-pill badge-critical"><i
+                                    class="fas fa-fire"></i>
                                 CRITICAL</span>
                                 {% else %}
                                 <span class="badge-pill badge-low"><i class="fas fa-exclamation-triangle"></i> LOW
@@ -162,6 +187,38 @@
                         <strong style="color:#a78bfa;margin-left:auto">{{ p.suggested_qty }} units</strong>
                     </div>
 
+                    <!-- Supplier contact info -->
+                    {% if p.supplier_name %}
+                    <div
+                        style="margin-top:10px;padding:10px 12px;background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.18);border-radius:8px;font-size:12px">
+                        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                            <i class="fas fa-truck" style="color:#60a5fa;font-size:11px"></i>
+                            <span style="font-weight:700;color:var(--text)">{{ p.supplier_name }}</span>
+                        </div>
+                        <div style="display:flex;gap:12px;flex-wrap:wrap">
+                            {% if p.supplier_phone %}
+                            <a href="tel:{{ p.supplier_phone }}"
+                                style="color:#60a5fa;text-decoration:none;display:flex;align-items:center;gap:4px">
+                                <i class="fas fa-phone" style="font-size:10px"></i> {{ p.supplier_phone }}
+                            </a>
+                            {% endif %}
+                            {% if p.supplier_email %}
+                            <a href="mailto:{{ p.supplier_email }}"
+                                style="color:#60a5fa;text-decoration:none;display:flex;align-items:center;gap:4px">
+                                <i class="fas fa-envelope" style="font-size:10px"></i> {{ p.supplier_email }}
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div
+                        style="margin-top:10px;padding:6px 12px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px">
+                        <i class="fas fa-info-circle" style="font-size:10px"></i>
+                        No supplier assigned — <a href="/edit/{{ p.name }}"
+                            style="color:var(--primary2);text-decoration:underline">assign one</a>
+                    </div>
+                    {% endif %}
+
                 </div>
                 {% endfor %}
             </div>
@@ -181,6 +238,20 @@
         </div>
     </div>
 
+    <script>
+        function filterRefillCards() {
+            const q = document.getElementById('refillSearch').value.toLowerCase();
+            const cards = document.querySelectorAll('.refill-card');
+            let shown = 0;
+            cards.forEach(card => {
+                const name = card.getAttribute('data-name') || '';
+                const match = name.includes(q);
+                card.style.display = match ? '' : 'none';
+                if (match) shown++;
+            });
+            document.getElementById('refillCount').textContent = shown + ' of ' + cards.length + ' items';
+        }
+    </script>
     <script src="/static/enhancements.js"></script>
 </body>
 

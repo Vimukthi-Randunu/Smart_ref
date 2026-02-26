@@ -26,11 +26,13 @@
             <div class="sidebar-label">Operations</div>
             <a href="/inbound"><i class="fas fa-arrow-circle-down"></i> Inbound</a>
             <a href="/outbound"><i class="fas fa-arrow-circle-up"></i> Outbound</a>
+            <a href="/adjust"><i class="fas fa-sliders-h"></i> Adjust Stock</a>
             <a href="/refill"><i class="fas fa-bell"></i> Refill Alerts</a>
             <div class="sidebar-label">Analytics</div>
             <a href="/reports" class="active"><i class="fas fa-chart-pie"></i> Reports</a>
             <a href="/history"><i class="fas fa-history"></i> Movement History</a>
             <a href="/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
+            <a href="/profile"><i class="fas fa-cog"></i> Profile Settings</a>
         </nav>
         <div class="sidebar-footer">
             <div class="sidebar-user">
@@ -75,7 +77,7 @@
                 <div class="stat-card amber">
                     <i class="fas fa-coins stat-icon"></i>
                     <div class="stat-label"><i class="fas fa-coins"></i> Inventory Value</div>
-                    <div class="stat-value" style="font-size:22px;color:var(--green)">₹{{ "{:,.0f}".format(total_value)
+                    <div class="stat-value" style="font-size:22px;color:var(--green)">₹{{ total_value|indian
                         }}</div>
                     <div class="stat-sub">Cost of goods on hand</div>
                 </div>
@@ -187,7 +189,7 @@
                                 <td style="text-align:right;color:var(--primary2);font-weight:700">{{ p.sales_count }}
                                 </td>
                                 <td style="text-align:right;color:var(--green);font-weight:700">₹{{
-                                    "{:,.2f}".format(p.value) }}</td>
+                                    p.value|indian(2) }}</td>
                             </tr>
                             {% endfor %}
                             {% else %}
@@ -243,7 +245,7 @@
                                     {% endif %}
                                 </td>
                                 <td style="text-align:right;color:var(--red);font-weight:700">₹{{
-                                    "{:,.2f}".format(p.value) }}</td>
+                                    p.value|indian(2) }}</td>
                             </tr>
                             {% endfor %}
                             <tr style="border-top:2px solid var(--border)">
@@ -251,7 +253,7 @@
                                     style="text-align:right;font-weight:700;color:var(--muted);padding-top:12px">Total
                                     Capital in Dead Stock:</td>
                                 <td style="text-align:right;font-weight:900;color:var(--red);font-size:15px">₹{{
-                                    "{:,.2f}".format(dead_stock|sum(attribute='value')) }}</td>
+                                    (dead_stock|sum(attribute='value'))|indian(2) }}</td>
                             </tr>
                             {% else %}
                             <tr>
@@ -274,8 +276,9 @@
 
     <script src="/static/enhancements.js"></script>
     <script>
-        Chart.defaults.color = 'rgba(255,255,255,0.55)';
-        Chart.defaults.borderColor = 'rgba(255,255,255,0.07)';
+        const _isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        Chart.defaults.color = _isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)';
+        Chart.defaults.borderColor = _isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.07)';
         Chart.defaults.font.family = "'Inter',sans-serif";
 
         document.addEventListener('DOMContentLoaded', () => {

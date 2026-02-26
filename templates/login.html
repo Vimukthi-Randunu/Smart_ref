@@ -591,51 +591,88 @@
 
         /* ── WELCOME ANIMATION on submit ── */
         const form = document.getElementById('login-form');
-        form.addEventListener('submit', function (e) {
-            e.preventDefault(); // hold the submit — show animation first
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
 
             const username = document.getElementById('username').value.trim();
-            if (!username) { form.submit(); return; } // fallback if empty (server validates)
-
+            const password = document.getElementById('password').value;
             const nextField = form.querySelector('input[name="next"]').value;
-            const destLabel = nextField === '/products' ? 'Warehouse Stock' :
-                nextField === '/dashboard' ? 'Dashboard' :
-                    nextField ? nextField.replace('/', '') : 'Dashboard';
 
-            // Populate overlay text
-            document.getElementById('w-username').textContent = username;
-            document.getElementById('w-dest').textContent = destLabel;
+            if (!username || !password) return;
 
-            // Spawn burst particles
-            const overlay = document.getElementById('welcome-overlay');
-            const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
-            const colors = ['#6c63ff', '#a78bfa', '#f59e0b', '#34d399', '#f87171', '#60a5fa'];
-            for (let i = 0; i < 24; i++) {
-                const d = document.createElement('div');
-                const angle = (i / 24) * Math.PI * 2;
-                const dist = 90 + Math.random() * 180;
-                d.className = 'w-particle';
-                d.style.cssText = `
+            const btn = document.getElementById('submit-btn');
+            const originalBtnText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password,
+                        next: nextField
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const destLabel = nextField === '/products' ? 'Warehouse Stock' :
+                        nextField === '/dashboard' ? 'Dashboard' :
+                            nextField ? nextField.replace('/', '') : 'Dashboard';
+
+                    // Populate overlay text
+                    document.getElementById('w-username').textContent = username;
+                    document.getElementById('w-dest').textContent = destLabel;
+
+                    // Spawn burst particles
+                    const overlay = document.getElementById('welcome-overlay');
+                    const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+                    const colors = ['#6c63ff', '#a78bfa', '#f59e0b', '#34d399', '#f87171', '#60a5fa'];
+                    for (let i = 0; i < 24; i++) {
+                        const d = document.createElement('div');
+                        const angle = (i / 24) * Math.PI * 2;
+                        const dist = 90 + Math.random() * 180;
+                        d.className = 'w-particle';
+                        d.style.cssText = `
           left:${cx}px; top:${cy - 60}px;
           width:${5 + Math.random() * 7}px; height:${5 + Math.random() * 7}px;
           background:${colors[i % colors.length]};
           --tx:${Math.cos(angle) * dist}px; --ty:${Math.sin(angle) * dist}px;
           --dur:${0.9 + Math.random() * 0.5}s; --del:${0.35 + Math.random() * 0.3}s;
         `;
-                overlay.appendChild(d);
+                        overlay.appendChild(d);
+                    }
+
+                    // Pop orbs
+                    document.querySelectorAll('.w-orb').forEach(o => o.classList.add('pop'));
+
+                    // Show overlay
+                    overlay.classList.add('visible');
+
+                    // After animation, redirect
+                    setTimeout(() => {
+                        overlay.classList.add('fade-out');
+                        setTimeout(() => window.location.href = data.redirect, 420);
+                    }, 2500);
+                } else {
+                    document.querySelectorAll('.flash').forEach(el => el.remove());
+                    const flashDiv = document.createElement('div');
+                    flashDiv.className = 'flash flash-error';
+                    flashDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i>${data.error}`;
+                    const brand = document.querySelector('.brand');
+                    brand.parentNode.insertBefore(flashDiv, brand.nextSibling);
+
+                    btn.innerHTML = originalBtnText;
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                console.error(err);
+                btn.innerHTML = originalBtnText;
+                btn.disabled = false;
             }
-
-            // Pop orbs
-            document.querySelectorAll('.w-orb').forEach(o => o.classList.add('pop'));
-
-            // Show overlay
-            overlay.classList.add('visible');
-
-            // After animation, submit for real
-            setTimeout(() => {
-                overlay.classList.add('fade-out');
-                setTimeout(() => form.submit(), 420);
-            }, 2500);
         });
     </script>
 </body>

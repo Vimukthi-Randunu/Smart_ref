@@ -65,136 +65,160 @@
 
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:900px">
 
-                <!-- ── EMAIL SETTINGS ── -->
+                <!-- ── EMAILJS SETTINGS ── -->
                 <div class="form-card fade-in" style="grid-column:1/-1">
-                    <div class="section-heading" style="margin-bottom:22px">
-                        <i class="fas fa-envelope"></i> Alert Recipient Settings
+
+                    <!-- Header row -->
+                    <div class="section-heading"
+                        style="margin-bottom:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                        <span><i class="fas fa-envelope"></i> Email Alert Settings</span>
+                        {% if user.emailjs_service_id and user.emailjs_template_id and user.emailjs_public_key and
+                        user.email %}
+                        <span
+                            style="font-size:12px;font-weight:600;color:#34d399;background:rgba(52,211,153,.1);padding:3px 12px;border-radius:20px;border:1px solid rgba(52,211,153,.25)">
+                            <i class="fas fa-check-circle"></i> EmailJS Configured — Alerts Active
+                        </span>
+                        {% else %}
+                        <span
+                            style="font-size:12px;font-weight:600;color:#fbbf24;background:rgba(251,191,36,.1);padding:3px 12px;border-radius:20px;border:1px solid rgba(251,191,36,.25)">
+                            <i class="fas fa-exclamation-triangle"></i> Not Configured — Fill in below
+                        </span>
+                        {% endif %}
                     </div>
+
                     <p style="color:var(--muted);font-size:13px;margin-bottom:22px;line-height:1.7">
-                        SmartRefill automatically sends you an email whenever any product drops to
-                        <strong style="color:var(--accent)">LOW</strong> or
-                        <strong style="color:var(--red)">CRITICAL</strong> stock — triggered instantly after any
-                        outbound movement AND checked every 6 hours in the background.
-                        A <strong style="color:var(--text)">2-hour cooldown</strong> prevents inbox flooding.
+                        SmartRefill securely uses <strong style="color:var(--text)">EmailJS</strong> in the background
+                        to send low-stock alerts.
+                        Fill in your EmailJS credentials once, and SmartRefill will
+                        <strong style="color:var(--accent)">automatically email you</strong> when a SKU's stock drops to
+                        LOW or CRITICAL during outbound scanning.
                     </p>
 
                     <form method="POST" action="/profile">
-                        <input type="hidden" name="action" value="update_email">
-                        <input type="hidden" name="smtp_email" value="{{ user.smtp_email or '' }}">
-                        <input type="hidden" name="smtp_pass" value="{{ user.smtp_pass or '' }}">
-                        <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end">
+                        <input type="hidden" name="action" value="update_emailjs">
+
+                        <!-- Row 1: Recipient email + toggle -->
+                        <div
+                            style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end;margin-bottom:18px">
                             <div class="form-group" style="margin-bottom:0">
                                 <label><i class="fas fa-at"></i> Recipient Email Address</label>
                                 <input type="email" name="email" class="form-control" id="profile-email"
-                                    value="{{ user.email or '' }}" placeholder="where_to_send_alerts@gmail.com">
+                                    value="{{ user.email or '' }}" placeholder="alerts@yourdomain.com">
                                 <small style="color:var(--muted);font-size:11.5px;margin-top:5px;display:block">
-                                    Alerts will be sent to this address. Can be different from your Gmail sender.
+                                    The inbox where low-stock alerts will land.
                                 </small>
                             </div>
-                            <button type="submit" class="btn-glow" style="height:44px;white-space:nowrap">
-                                <i class="fas fa-save"></i> Save
-                            </button>
                         </div>
 
-                        <!-- Toggle switch -->
-                        <div
-                            style="margin-top:18px;display:flex;align-items:center;gap:14px;padding:16px;background:var(--glass);border:1px solid var(--border);border-radius:10px">
-                            <label class="toggle-switch">
+                        <!-- Row 2: EmailJS credentials grid -->
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+                            <div class="form-group" style="margin-bottom:0">
+                                <label><i class="fas fa-server"></i> Service ID</label>
+                                <input type="text" name="emailjs_service_id" class="form-control"
+                                    value="{{ user.emailjs_service_id or '' }}" placeholder="service_xxxxxxx"
+                                    autocomplete="off">
+                                <small style="color:var(--muted);font-size:11px;margin-top:5px;display:block">
+                                    From EmailJS → Email Services
+                                </small>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0">
+                                <label><i class="fas fa-file-alt"></i> Template ID</label>
+                                <input type="text" name="emailjs_template_id" class="form-control"
+                                    value="{{ user.emailjs_template_id or '' }}" placeholder="template_xxxxxxx"
+                                    autocomplete="off">
+                                <small style="color:var(--muted);font-size:11px;margin-top:5px;display:block">
+                                    From EmailJS → Email Templates
+                                </small>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0">
+                                <label><i class="fas fa-key"></i> Public Key</label>
+                                <input type="text" name="emailjs_public_key" class="form-control"
+                                    value="{{ user.emailjs_public_key or '' }}" placeholder="xxxxxxxxxxxxxxxx"
+                                    autocomplete="off">
+                                <small style="color:var(--muted);font-size:11px;margin-top:5px;display:block">
+                                    From EmailJS → Account → API Keys (Public Key)
+                                </small>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0">
+                                <label><i class="fas fa-lock"></i> Private Key <span
+                                        style="color:#f87171;font-size:10px">(Required for auto-alerts)</span></label>
+                                <input type="password" name="emailjs_private_key" class="form-control"
+                                    value="{{ user.emailjs_private_key or '' }}" placeholder="xxxxxxxxxxxxxxxx"
+                                    autocomplete="off">
+                                <small style="color:var(--muted);font-size:11px;margin-top:5px;display:block">
+                                    From EmailJS → Account → API Keys (Private Key)
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Toggle + Save row -->
+                        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+                            <button type="submit" class="btn-glow" style="padding:10px 28px">
+                                <i class="fas fa-save"></i> Save Email Settings
+                            </button>
+                            <label class="toggle-switch" style="flex-shrink:0">
                                 <input type="checkbox" name="email_alerts" id="email-alerts-toggle" {% if
                                     user.email_alerts %}checked{% endif %} onchange="this.form.submit()">
                                 <span class="toggle-slider"></span>
                             </label>
                             <div>
-                                <div style="font-weight:600;font-size:13.5px;color:var(--text)">Automatic Email Alerts
-                                    Enabled</div>
-                                <div style="font-size:12px;color:var(--muted)">Fires automatically on every outbound
-                                    movement that triggers a LOW/CRITICAL level, and every 6 hours</div>
+                                <div style="font-weight:600;font-size:13px;color:var(--text)">Auto-alerts enabled</div>
+                                <div style="font-size:11.5px;color:var(--muted)">Fires when stock hits LOW/CRITICAL
+                                </div>
                             </div>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- ── SMTP CONFIGURATION ── -->
-                <div class="form-card fade-in" style="grid-column:1/-1;border-left:3px solid var(--primary)">
-                    <div class="section-heading" style="margin-bottom:8px">
-                        <i class="fab fa-google" style="color:#ea4335"></i> Gmail SMTP Setup
-                        {% if user.smtp_email and user.smtp_pass %}
-                        <span
-                            style="font-size:12px;font-weight:600;color:#34d399;margin-left:12px;background:rgba(52,211,153,.1);padding:3px 10px;border-radius:20px;border:1px solid rgba(52,211,153,.25)">
-                            <i class="fas fa-check-circle"></i> Configured — Auto-alerts are ACTIVE
-                        </span>
-                        {% else %}
-                        <span
-                            style="font-size:12px;font-weight:600;color:#fbbf24;margin-left:12px;background:rgba(251,191,36,.1);padding:3px 10px;border-radius:20px;border:1px solid rgba(251,191,36,.25)">
-                            <i class="fas fa-exclamation-triangle"></i> Not Configured — Fill in below to activate
-                        </span>
-                        {% endif %}
-                    </div>
-                    <p style="color:var(--muted);font-size:12.5px;margin-bottom:20px;line-height:1.7">
-                        Enter your Gmail address and a <strong style="color:var(--text)">Gmail App Password</strong>.
-                        This is used as the sender for automatic stock alert emails.
-                        <a href="https://myaccount.google.com/apppasswords" target="_blank"
-                            style="color:var(--primary2)">
-                            <i class="fas fa-external-link-alt"></i> Generate a Gmail App Password →
-                        </a>
-                    </p>
-
-                    <form method="POST" action="/profile">
-                        <input type="hidden" name="action" value="update_email">
-                        <input type="hidden" name="email" value="{{ user.email or '' }}">
-                        <input type="hidden" name="email_alerts" value="{{ '1' if user.email_alerts else '' }}">
-
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-                            <div class="form-group">
-                                <label><i class="fab fa-google" style="color:#ea4335"></i> Gmail Address
-                                    (Sender)</label>
-                                <input type="email" name="smtp_email" class="form-control"
-                                    value="{{ user.smtp_email or '' }}" placeholder="yourgmail@gmail.com">
-                                <small style="color:var(--muted);font-size:11.5px;margin-top:5px;display:block">
-                                    The Gmail account that will send alerts.
-                                </small>
-                            </div>
-                            <div class="form-group">
-                                <label><i class="fas fa-key"></i> Gmail App Password</label>
-                                <input type="password" name="smtp_pass" class="form-control"
-                                    value="{{ user.smtp_pass or '' }}" placeholder="xxxx xxxx xxxx xxxx"
-                                    autocomplete="new-password">
-                                <small style="color:var(--muted);font-size:11.5px;margin-top:5px;display:block">
-                                    16-char App Password (not your Gmail login password).
-                                </small>
-                            </div>
-                        </div>
-
-                        <div style="display:flex;align-items:center;gap:14px;margin-top:4px">
-                            <button type="submit" class="btn-glow" style="padding:10px 28px">
-                                <i class="fas fa-shield-alt"></i> Save SMTP Settings
-                            </button>
-                            <span style="font-size:12px;color:var(--muted)">
-                                <i class="fas fa-bolt" style="color:#fbbf24"></i>
-                                Alerts fire automatically — no action needed after saving.
-                            </span>
                         </div>
                     </form>
 
                     <!-- Step-by-step guide -->
                     <div
-                        style="margin-top:22px;padding:16px;background:var(--bg);border:1px solid var(--border);border-radius:10px">
+                        style="margin-top:24px;padding:18px;background:var(--bg);border:1px solid var(--border);border-radius:10px">
                         <div
-                            style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px;letter-spacing:.5px;text-transform:uppercase">
-                            <i class="fas fa-list-ol"></i> Quick Setup Guide
+                            style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:12px;letter-spacing:.5px;text-transform:uppercase">
+                            <i class="fas fa-list-ol"></i> EmailJS Quick Setup (2 minutes)
                         </div>
-                        <ol style="color:var(--muted);font-size:12.5px;line-height:2.2;padding-left:18px;margin:0">
-                            <li>Enable <strong style="color:var(--text)">2-Step Verification</strong> on your Google
-                                account</li>
-                            <li>Go to <strong style="color:var(--text)">Google Account → Security → App
-                                    Passwords</strong></li>
-                            <li>Create an App Password named <strong style="color:var(--text)">"SmartRefill"</strong>
-                            </li>
-                            <li>Copy the 16-character password — paste it in the field above</li>
-                            <li>Enter your Gmail address and click <strong style="color:var(--text)">Save SMTP
-                                    Settings</strong></li>
-                            <li>Done! 🎉 Alerts will now fire automatically whenever stock runs low</li>
-                        </ol>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 32px">
+                            <ol style="color:var(--muted);font-size:12.5px;line-height:2.3;padding-left:18px;margin:0">
+                                <li>Go to <a href="https://www.emailjs.com/" target="_blank"
+                                        style="color:var(--primary2)">emailjs.com</a> and create a <strong
+                                        style="color:var(--text)">free account</strong></li>
+                                <li>Click <strong style="color:var(--text)">Email Services</strong> → Add New Service →
+                                    choose Gmail / Outlook / etc.</li>
+                                <li>Connect your Gmail (or any email) — this is the <strong
+                                        style="color:var(--text)">sender</strong></li>
+                                <li>Copy the <strong style="color:var(--text)">Service ID</strong> shown after
+                                    connecting</li>
+                            </ol>
+                            <ol start="5"
+                                style="color:var(--muted);font-size:12.5px;line-height:2.3;padding-left:18px;margin:0">
+                                <li>Go to <strong style="color:var(--text)">Email Templates</strong> → Create New
+                                    Template</li>
+                                <li>In the template body add: <code
+                                        style="background:var(--glass);padding:1px 6px;border-radius:4px;color:var(--text)">{{message}}</code>
+                                </li>
+                                <li>Save — copy the <strong style="color:var(--text)">Template ID</strong></li>
+                                <li>Go to <strong style="color:var(--text)">Account → API Keys</strong> → copy your
+                                    <strong style="color:var(--text)">Public Key</strong>
+                                </li>
+                                <li>Paste all 3 IDs above + your recipient email → <strong
+                                        style="color:var(--text)">Save</strong> 🎉</li>
+                            </ol>
+                        </div>
+                        <div
+                            style="margin-top:14px;padding:10px 14px;background:rgba(108,99,255,.1);border:1px solid rgba(108,99,255,.2);border-radius:8px;font-size:12px;color:var(--muted)">
+                            <i class="fas fa-info-circle" style="color:var(--primary2)"></i>
+                            <strong style="color:var(--text)">Template variables SmartRefill sends:</strong>
+                            <code
+                                style="background:var(--glass);padding:1px 6px;border-radius:4px;color:#a78bfa">{{to_email}}</code>
+                            <code
+                                style="background:var(--glass);padding:1px 6px;border-radius:4px;color:#a78bfa">{{username}}</code>
+                            <code
+                                style="background:var(--glass);padding:1px 6px;border-radius:4px;color:#a78bfa">{{alert_count}}</code>
+                            <code
+                                style="background:var(--glass);padding:1px 6px;border-radius:4px;color:#a78bfa">{{critical_count}}</code>
+                            <code
+                                style="background:var(--glass);padding:1px 6px;border-radius:4px;color:#a78bfa">{{message}}</code>
+                            — use any of these in your template.
+                        </div>
                     </div>
                 </div>
 
@@ -224,6 +248,36 @@
                             <i class="fas fa-shield-alt"></i> Update Password
                         </button>
                     </form>
+                </div>
+
+                <!-- ── ACCOUNT INFO ── -->
+                <div class="form-card fade-in"
+                    style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:14px">
+                    <div
+                        style="width:64px;height:64px;background:linear-gradient(135deg,var(--primary),var(--primary2));border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:20px;font-weight:800;color:var(--text)">{{ user.username }}</div>
+                        <div style="font-size:13px;color:var(--muted);margin-top:4px">{{ user.email or 'No email set' }}
+                        </div>
+                    </div>
+                    <div
+                        style="padding:10px 18px;background:var(--glass);border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--muted);width:100%">
+                        {% if user.emailjs_service_id and user.emailjs_template_id and user.emailjs_public_key %}
+                        <i class="fas fa-bolt" style="color:#34d399"></i> <strong style="color:#34d399">EmailJS
+                            Active</strong><br>
+                        Sends via <code style="color:var(--text)">{{ user.emailjs_service_id }}</code>
+                        {% else %}
+                        <i class="fas fa-envelope-open" style="color:#fbbf24"></i> <strong style="color:#fbbf24">EmailJS
+                            not configured</strong><br>
+                        Fill in the form to activate alerts.
+                        {% endif %}
+                    </div>
+                    <a href="/refill" class="btn-glow"
+                        style="width:100%;text-align:center;text-decoration:none;display:block;padding:10px">
+                        <i class="fas fa-bell"></i> Go to Refill Alerts
+                    </a>
                 </div>
 
             </div>

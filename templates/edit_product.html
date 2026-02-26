@@ -25,11 +25,13 @@
             <div class="sidebar-label">Operations</div>
             <a href="/inbound"><i class="fas fa-arrow-circle-down"></i> Inbound</a>
             <a href="/outbound"><i class="fas fa-arrow-circle-up"></i> Outbound</a>
+            <a href="/adjust"><i class="fas fa-sliders-h"></i> Adjust Stock</a>
             <a href="/refill"><i class="fas fa-bell"></i> Refill Alerts</a>
             <div class="sidebar-label">Analytics</div>
             <a href="/reports"><i class="fas fa-chart-pie"></i> Reports</a>
             <a href="/history"><i class="fas fa-history"></i> Movement History</a>
             <a href="/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
+            <a href="/profile"><i class="fas fa-cog"></i> Profile Settings</a>
         </nav>
         <div class="sidebar-footer">
             <div class="sidebar-user">
@@ -150,6 +152,14 @@
                                             %}>{{ s[1] }}</option>
                                         {% endfor %}
                                     </select>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-calendar-alt"></i> Expiry Date (Optional)</label>
+                                    <input type="date" name="expiry_date" class="form-control"
+                                        value="{{ product.expiry_date if product.expiry_date else '' }}">
+                                    <small
+                                        style="color:var(--muted);font-size:11.5px;margin-top:4px;display:block">Leave
+                                        blank if non-perishable</small>
                                 </div>
                             </div>
                         </div>

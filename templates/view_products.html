@@ -26,11 +26,13 @@
             <div class="sidebar-label">Operations</div>
             <a href="/inbound"><i class="fas fa-arrow-circle-down"></i> Inbound</a>
             <a href="/outbound"><i class="fas fa-arrow-circle-up"></i> Outbound</a>
+            <a href="/adjust"><i class="fas fa-sliders-h"></i> Adjust Stock</a>
             <a href="/refill"><i class="fas fa-bell"></i> Refill Alerts</a>
             <div class="sidebar-label">Analytics</div>
             <a href="/reports"><i class="fas fa-chart-pie"></i> Reports</a>
             <a href="/history"><i class="fas fa-history"></i> Movement History</a>
             <a href="/suppliers"><i class="fas fa-truck"></i> Suppliers</a>
+            <a href="/profile"><i class="fas fa-cog"></i> Profile Settings</a>
         </nav>
         <div class="sidebar-footer">
             <div class="sidebar-user">
@@ -51,9 +53,16 @@
                 <p>Complete inventory of all SKUs &nbsp;·&nbsp; {{ products|length }} products</p>
             </div>
             <div class="topbar-right">
+                <form id="importForm" action="/import_csv" method="POST" enctype="multipart/form-data"
+                    style="display:none">
+                    <input type="file" id="csvFile" name="file" accept=".csv"
+                        onchange="if(this.files[0]) document.getElementById('importForm').submit()">
+                </form>
+                <button onclick="document.getElementById('csvFile').click()" class="btn-ghost"
+                    style="border-style:dashed"><i class="fas fa-file-import"></i> Import CSV</button>
                 <a href="/add" class="btn-glow"><i class="fas fa-plus"></i> Add SKU</a>
                 <button
-                    onclick="SmartRefill && SmartRefill.exportTableToCSV ? SmartRefill.exportTableToCSV('stock.csv') : window.print()"
+                    onclick="SmartRefill && SmartRefill.exportTableToCSV ? SmartRefill.exportTableToCSV('stock.xls') : window.print()"
                     class="btn-ghost"><i class="fas fa-download"></i> Export CSV</button>
             </div>
         </div>
@@ -112,6 +121,7 @@
                                 <th>Cost / Unit</th>
                                 <th>Total Value</th>
                                 <th>Status</th>
+                                <th>Expiry</th>
                                 <th style="text-align:center">Actions</th>
                             </tr>
                         </thead>
@@ -137,8 +147,8 @@
                                 <td><span class="badge-pill badge-cat">{{ p.category }}</span></td>
                                 <td><strong style="color:var(--primary2);font-size:15px">{{ p.quantity }}</strong></td>
                                 <td style="color:var(--muted)">{{ p.reorder }}</td>
-                                <td style="color:var(--muted)">₹{{ "{:,.2f}".format(p.cost) }}</td>
-                                <td><strong style="color:var(--green)">₹{{ "{:,.0f}".format(p.quantity * p.cost)
+                                <td style="color:var(--muted)">₹{{ p.cost|indian(2) }}</td>
+                                <td><strong style="color:var(--green)">₹{{ (p.quantity * p.cost)|indian
                                         }}</strong></td>
                                 <td>
                                     {% if p.status == 'NORMAL' %}
@@ -149,6 +159,21 @@
                                         Low</span>
                                     {% else %}
                                     <span class="badge-pill badge-critical"><i class="fas fa-fire"></i> Critical</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if p.expiry_date %}
+                                    {% if p.expiry_status == 'EXPIRED' %}
+                                    <span class="badge-pill badge-critical" title="Expired"><i
+                                            class="fas fa-times-circle"></i> {{ p.expiry_date }}</span>
+                                    {% elif p.expiry_status == 'EXPIRING_SOON' %}
+                                    <span class="badge-pill badge-low" title="Expiring within 30 days"><i
+                                            class="fas fa-clock"></i> {{ p.expiry_date }}</span>
+                                    {% else %}
+                                    <span style="color:var(--muted);font-size:13px">{{ p.expiry_date }}</span>
+                                    {% endif %}
+                                    {% else %}
+                                    <span style="color:rgba(255,255,255,0.2)">—</span>
                                     {% endif %}
                                 </td>
                                 <td style="text-align:center">
@@ -172,16 +197,17 @@
 
     <script src="/static/enhancements.js"></script>
     <script>
-        Chart.defaults.color = 'rgba(255,255,255,0.55)';
-        Chart.defaults.borderColor = 'rgba(255,255,255,0.07)';
+        const _isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        Chart.defaults.color = _isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)';
+        Chart.defaults.borderColor = _isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.07)';
         Chart.defaults.font.family = "'Inter',sans-serif";
 
-        const products = {{ products | tojson }};
+        var products = {{ products | tojson }};
 
         // Count statuses
-        let normal = 0, low = 0, critical = 0;
+        var normal = 0, low = 0, critical = 0;
         products.forEach(p => { if (p.status === 'NORMAL') normal++; else if (p.status === 'LOW') low++; else critical++; });
-        const top5 = [...products].sort((a, b) => b.quantity - a.quantity).slice(0, 5);
+        var top5 = [...products].sort((a, b) => b.quantity - a.quantity).slice(0, 5);
 
         if (document.getElementById('statusChart')) {
             new Chart(document.getElementById('statusChart'), {
@@ -213,7 +239,7 @@
                 options: {
                     indexAxis: 'y', responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
-                    scales: { x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } }, y: { grid: { display: false } } }
+                    scales: { x: { beginAtZero: true, grid: { color: _isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)' } }, y: { grid: { display: false } } }
                 }
             });
         }
