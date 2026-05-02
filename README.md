@@ -1,9 +1,11 @@
+# 🔗 Live Demo
+https://smart-ref.onrender.com
+ 
 # 📦 SmartRefill — Warehouse Inventory Management System
 
 A full-featured, multi-tenant warehouse management web application built with **Python Flask** and **SQLite**. SmartRefill helps teams track stock levels, manage inbound/outbound movements, monitor suppliers, generate reports, and receive low-stock email alerts — all through a clean, modern dark-themed UI.
 
 ---
-
 ## 🚀 Features
 
 ### 🔐 Authentication & User Management
