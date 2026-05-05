@@ -1,7 +1,7 @@
 import sqlite3
 
 def get_connection():
-    conn = sqlite3.connect("inventory.db")
+    conn = sqlite3.connect("data/inventory.db")
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 

@@ -1,7 +1,7 @@
 import sqlite3
 
 def add_cost_column():
-    conn = sqlite3.connect("inventory.db")
+    conn = sqlite3.connect("data/inventory.db")
     cur = conn.cursor()
     
     try:

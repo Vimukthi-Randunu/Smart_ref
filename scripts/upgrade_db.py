@@ -5,7 +5,7 @@ def upgrade_database():
     Upgrades the database to support multi-tenant architecture.
     Adds user_id column to products and stock_movements tables.
     """
-    conn = sqlite3.connect("inventory.db")
+    conn = sqlite3.connect("data/inventory.db")
     cur = conn.cursor()
     
     print("Starting database upgrade for multi-tenant support...")

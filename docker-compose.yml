@@ -1,0 +1,9 @@
+services:
+  flask-web-app:
+    build: .
+    ports:
+      - "5001:5000"
+    environment:
+      - SECRET_KEY=smart_refill_secret_key_local
+    volumes:
+      - ./data:/app/data
