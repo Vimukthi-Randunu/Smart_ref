@@ -17,6 +17,10 @@ def init_db():
             password TEXT NOT NULL,
             email TEXT DEFAULT NULL,
             email_alerts INTEGER DEFAULT 1,
+            emailjs_service_id TEXT DEFAULT NULL,
+            emailjs_template_id TEXT DEFAULT NULL,
+            emailjs_public_key TEXT DEFAULT NULL,
+            emailjs_private_key TEXT DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -54,6 +58,20 @@ def init_db():
         )
     """)
     
+    # Suppliers table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS suppliers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            contact_name TEXT,
+            phone TEXT,
+            email TEXT,
+            address TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
+
     conn.commit()
     conn.close()
     print("✅ Database initialized with multi-tenant support!")
