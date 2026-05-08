@@ -58,10 +58,10 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: IMAGE_TAG,SECRET_KEY
           script: |
-                cat <<EOF > docker-compose.prod.yml
-                version: '3.8'
-                services:
-                  flask-web-app:
+            cat <<EOF > docker-compose.prod.yml
+            version: '3.8'
+            services:
+                flask-web-app:
                     image: vimukthirandunu/smart-ref:$IMAGE_TAG
                     ports:
                       - "5000:5000"
@@ -69,10 +69,10 @@ jobs:
                       - SECRET_KEY=$SECRET_KEY
                     volumes:
                       - ./data:/app/data
-                EOF      
-                docker compose -f docker-compose.prod.yml pull
-                docker compose -f docker-compose.prod.yml up -d --remove-orphans
-                curl -f http://localhost:5000 || exit 1
+            EOF      
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            curl -f http://localhost:5000 || exit 1
         env:
           IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}          
@@ -90,10 +90,10 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: IMAGE_TAG,SECRET_KEY
           script: |
-                cat <<EOF > docker-compose.prod.yml
-                version: '3.8'
-                services:
-                  flask-web-app:
+            cat <<EOF > docker-compose.prod.yml
+            version: '3.8'
+            services:
+                flask-web-app:
                     image: vimukthirandunu/smart-ref: $IMAGE_TAG
                     ports:
                       - "5000:5000"
@@ -101,10 +101,10 @@ jobs:
                       - SECRET_KEY= $SECRET_KEY
                     volumes:
                       - ./data:/app/data
-                EOF      
-                docker compose -f docker-compose.prod.yml pull
-                docker compose -f docker-compose.prod.yml up -d --remove-orphans
-                curl -f http://localhost:5000 || exit 1
+            EOF      
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            curl -f http://localhost:5000 || exit 1
         env:
           IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}          
