@@ -88,9 +88,9 @@ jobs:
             "      - ./data:/app/data" \
             > docker-compose.prod.yml
 
-            docker-compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml pull
 
-            docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
             sleep 10
 
@@ -129,9 +129,9 @@ jobs:
             "      - ./data:/app/data" \
             > docker-compose.prod.yml
 
-            docker-compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml pull
 
-            docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
             sleep 10
 
