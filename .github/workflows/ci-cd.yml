@@ -93,7 +93,7 @@ jobs:
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
             sleep 10
-
+            docker compose -f docker-compose.prod.yml exec flask-web-app python database.py
             curl -f http://localhost:5000 || exit 1
 
   deploy-production:
@@ -134,5 +134,5 @@ jobs:
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
             sleep 10
-
+            docker compose -f docker-compose.prod.yml exec flask-web-app python database.py
             curl -f http://localhost:5000 || exit 1
