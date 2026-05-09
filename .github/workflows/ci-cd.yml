@@ -94,7 +94,15 @@ jobs:
 
             sleep 10
             docker compose -f docker-compose.prod.yml exec flask-web-app python database.py
-            curl -f http://localhost:5000 || exit 1
+            if ! curl -f http://localhost:5000; then
+                echo "Health check failed. Rolling back..."
+                docker compose -f docker-compose.prod.yml down
+                sed -i "s|vimukthirandunu/smart-ref:$IMAGE_TAG|vimukthirandunu/smart-ref:latest|g" docker-compose.prod.yml
+                docker compose -f docker-compose.prod.yml pull
+                docker compose -f docker-compose.prod.yml up -d --remove-orphans
+                echo "Rollback complete"
+                exit 1
+            fi
 
   deploy-production:
     runs-on: ubuntu-latest
@@ -135,4 +143,12 @@ jobs:
 
             sleep 10
             docker compose -f docker-compose.prod.yml exec flask-web-app python database.py
-            curl -f http://localhost:5000 || exit 1
+            if ! curl -f http://localhost:5000; then
+                echo "Health check failed. Rolling back..."
+                docker compose -f docker-compose.prod.yml down
+                sed -i "s|vimukthirandunu/smart-ref:$IMAGE_TAG|vimukthirandunu/smart-ref:latest|g" docker-compose.prod.yml
+                docker compose -f docker-compose.prod.yml pull
+                docker compose -f docker-compose.prod.yml up -d --remove-orphans
+                echo "Rollback complete"
+                exit 1
+            fi
